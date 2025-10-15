@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kvíz – Ovális pókerasztal animációkkal</title>
+<style>
+  :root{
+    --table-green-1:#0e5f35;
+    --table-green-2:#094525;
+    --felt:#0a5a31;
+    --chip:#f1c40f;
+    --chip-text:#1b1b1b;
+    --player:#218c3c;
+    --player-out:#666;
+    --me-ring:gold;
+  }
+  html,body{margin:0;padding:0;background:#1b1b1b;color:#ecf0f1;font-family:Arial,Helvetica,sans-serif;}
+  header{padding:10px 12px;text-align:center;background:#c0392b;}
+  header small{display:block;color:#f1c40f}
+  #table{
+    width:min(92vw,1000px); height:min(60vw,620px);
+    margin:18px auto; position:relative; overflow:hidden;
+    background: radial-gradient(circle at 50% 45%, var(--table-green-1), var(--table-green-2) 70%);
+    border-radius:50% / 35%;
+    box-shadow: 0 25px 60px rgba(0,0,0,.55), inset 0 0 80px rgba(0,0,0,.6);
+    border:8px solid #3a2317;
+  }
+
+  /* Központi UI – kérdés, válasz, infósor */
+  #centerUI{
+    position:absolute; inset:12% 18% 18% 18%; display:flex; flex-direction:column; justify-content:space-between; align-items:center; text-align:center;
+  }
+  #question{font-size:1.2rem; line-height:1.35; margin:0 0 .6rem;}
+  #answers{display:grid; grid-template-columns:1fr 1fr; gap:.5rem; width:min(520px,100%);}
+  .answer-btn{
+    padding:.6rem .9rem; border:none; border-radius:10px; background:#2d7bd1; color:#fff; font-size:1rem; cursor:pointer;
+    transition:transform .1s ease, background .2s ease;
+  }
+  .answer-btn:hover{background:#1abc9c; transform:translateY(-1px);}
+  .answer-btn:disabled{opacity:.6; cursor:not-allowed}
+
+  #infoBar{
+    display:grid; grid-template-columns:repeat(4,auto); gap:1rem; align-items:center; justify-content:center; margin-top:.6rem; font-weight:bold;
+  }
+  #infoBar .pill{
+    background:rgba(0,0,0,.25); padding:.35rem .6rem; border-radius:999px; box-shadow:inset 0 0 0 2px rgba(255,255,255,.06);
+  }
+
+  /* Játékosok a peremen */
+  .player{
+    width:72px; height:72px; position:absolute; border-radius:50%; background:var(--player);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:6px; box-sizing:border-box;
+    font-size:.8rem; line-height:1.1; user-select:none;
+    box-shadow:0 3px 10px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.08);
+    transition:transform .2s ease, opacity .2s ease, background .2s ease;
+  }
+  .player.me{outline:3px solid var(--me-ring); box-shadow:0 0 10px var(--me-ring), inset 0 0 0 2px rgba(255,255,255,.08);}
+  .player.out{background:var(--player-out); opacity:.55; filter:grayscale(.3)}
+  .player .name{font-weight:bold}
+  .player .pts{font-size:.75rem; opacity:.9}
+
+  /* Zsetonok (animációs elemek) */
+  .chip{
+    position:absolute; width:28px; height:28px; border-radius:50%;
+    background:radial-gradient(circle at 35% 35%, #ffe27a, var(--chip));
+    box-shadow:0 3px 8px rgba(0,0,0,.45), inset 0 0 0 3px rgba(0,0,0,.15);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--chip-text); font-weight:bold; font-size:.72rem;
+    transform:translate(-50%,-50%);
+    transition:left .6s ease, top .6s ease, opacity .3s ease;
+    pointer-events:none; z-index:20;
+  }
+
+  /* Villogtatás győztesen */
+  @keyframes winnerFlash {
+    0%, 100% { box-shadow:0 0 0 0 rgba(255,255,255,.0), 0 0 10px 2px rgba(80,255,120,.0) inset; }
+    50% { box-shadow:0 0 18px 3px rgba(80,255,120,.65), 0 0 14px 4px rgba(80,255,120,.55) inset; }
+  }
+  .flash { animation:winnerFlash .45s ease-in-out 4; }
+
+  /* Középső „pot” célpont */
+  #potCenter{
+    position:absolute; left:50%; top:48%; transform:translate(-50%,-50%);
+    width:120px; height:120px; border-radius:50%;
+    border:2px dashed rgba(255,255,255,.25);
+    display:flex; align-items:center; justify-content:center;
+    color:#f9d17a; font-weight:bold; pointer-events:none; opacity:.9;
+  }
+
+  /* Válasz státusz */
+  #roundMsg{
+    position:absolute; bottom:8px; left:50%; transform:translateX(-50%);
+    font-style:italic; opacity:.9; font-size:.95rem;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div><strong>QuizMaster – Interaktív pókerasztal</strong></div>
+    <small>Csak egy maradhat</small>
+  </header>
+
+  <div id="table">
+    <!-- központi cél a zsetonoknak -->
+    <div id="potCenter">POT</div>
+
+    <!-- központi UI -->
+    <div id="centerUI">
+      <div>
+        <div id="question">Betöltés…</div>
+        <div id="answers"></div>
+      </div>
+
+      <div id="infoBar">
+        <div class="pill">⏱️ Idő: <span id="timer">15</span>s</div>
+        <div class="pill">🎲 Tét: <span id="stake">10</span></div>
+        <div class="pill">💰 Pot: <span id="pot">0</span></div>
+        <div class="pill">📊 Helyezésed: <span id="rank">-</span></div>
+      </div>
+    </div>
+
+    <div id="roundMsg"></div>
+  </div>
+
+<script>
+/* ================================
+   KÉRDÉSEK – ITT SZERKESZTHETED
+   ================================ */
+let questions = [
+{q:"Mi a fővárosa Svédországnak?", a:["Stockholm","Oslo","Helsinki","Koppenhága"], correct:0},
+{q:"Melyik évben kezdődött az I. világháború?", a:["1912","1914","1916","1918"], correct:1},
+{q:"Ki festette a 'Szorakozó lány' című festményt?", a:["Monet","Degas","Renoir","Picasso"], correct:2},
+{q:"Mi a legnagyobb kontinens a Földön?", a:["Afrika","Ázsia","Európa","Dél-Amerika"], correct:1},
+{q:"Melyik bolygó a Naprendszerben a legforróbb?", a:["Merkúr","Vénusz","Mars","Jupiter"], correct:1},
+{q:"Ki írta a 'To Kill a Mockingbird'-ot?", a:["Harper Lee","Mark Twain","Orwell","Shakespeare"], correct:0},
+{q:"Melyik országban található a Serengeti Nemzeti Park?", a:["Kenya","Tanzánia","Uganda","Dél-Afrika"], correct:1},
+{q:"Mi a kémiai jele az oxigénnek?", a:["O","Ox","Oxg","O2"], correct:0},
+{q:"Ki volt az USA elnöke 2009 és 2017 között?", a:["George W. Bush","Barack Obama","Bill Clinton","Donald Trump"], correct:1},
+{q:"Melyik ország híres a tulipánjairól?", a:["Hollandia","Belgium","Németország","Franciaország"], correct:0},
+{q:"Mi a leggyorsabb madár a levegőben?", a:["Héja","Sólyom","Sas","Kánya"], correct:1},
+{q:"Ki írta a 'Divina Commedia'-t?", a:["Dante","Goethe","Shakespeare","Tolstoy"], correct:0},
+{q:"Melyik országban található a Machu Picchu?", a:["Peru","Chile","Brazília","Kolumbia"], correct:0},
+{q:"Mi a fővárosa Finnországnak?", a:["Helsinki","Oslo","Stockholm","Tallinn"], correct:0},
+{q:"Melyik évben szűnt meg a Szovjetunió?", a:["1989","1990","1991","1992"], correct:2},
+{q:"Mi a legnagyobb óceán a Földön?", a:["Atlanti-óceán","Csendes-óceán","Indiai-óceán","Jeges-tenger"], correct:1},
+{q:"Ki volt az első ember az űrben?", a:["Neil Armstrong","Yuri Gagarin","Buzz Aldrin","John Glenn"], correct:1},
+{q:"Melyik ország fővárosa Lisszabon?", a:["Spanyolország","Portugália","Olaszország","Franciaország"], correct:1},
+{q:"Mi a kémiai jele a nátriumnak?", a:["Na","N","Nm","Nt"], correct:0},
+{q:"Ki írta a 'Pride and Prejudice'-t?", a:["Jane Austen","Emily Brontë","Charles Dickens","Mary Shelley"], correct:0},
+{q:"Melyik ország zászlaján van a vörös sárkány?", a:["Wales","Kína","Japán","Bhután"], correct:0},
+{q:"Mi a legmagasabb hegy a világon?", a:["K2","Everest","Denali","Kangchenjunga"], correct:1},
+{q:"Melyik bolygó híres a gyűrűiről?", a:["Szaturnusz","Jupiter","Mars","Uránusz"], correct:0},
+{q:"Mi a fővárosa Ausztráliának?", a:["Sydney","Melbourne","Canberra","Brisbane"], correct:2},
+{q:"Ki volt az első női Nobel-díjas?", a:["Marie Curie","Rosalind Franklin","Jane Goodall","Ada Lovelace"], correct:0},
+{q:"Mi a fővárosa Norvégiának?", a:["Oslo","Stockholm","Helsinki","Reykjavík"], correct:0},
+{q:"Melyik állat a legnagyobb szárazföldön?", a:["Elefánt","Zsiráf","Oroszlán","Bivaly"], correct:0},
+{q:"Melyik évben kezdődött a II. világháború?", a:["1937","1939","1941","1945"], correct:1},
+{q:"Ki festette a 'Guernicát'?", a:["Picasso","Da Vinci","Van Gogh","Michelangelo"], correct:0},
+{q:"Melyik ország fővárosa Budapest?", a:["Magyarország","Ausztria","Csehország","Szlovákia"], correct:0},
+{q:"Mi a kémiai jele az aranynak?", a:["Au","Ag","Fe","Hg"], correct:0},
+{q:"Ki volt az első ember a Holdon?", a:["Neil Armstrong","Yuri Gagarin","Buzz Aldrin","John Glenn"], correct:0},
+{q:"Melyik ország híres a sushiról?", a:["Kína","Japán","Korea","Thaiföld"], correct:1},
+{q:"Mi a legnagyobb édesvízi tó a világon?", a:["Tanganjika-tó","Huron-tó","Michigan-tó","Balaton"], correct:1},
+{q:"Ki írta a '1984'-et?", a:["George Orwell","Huxley","Tolstoy","Kafka"], correct:0},
+{q:"Melyik ország fővárosa Berlin?", a:["Ausztria","Németország","Svájc","Hollandia"], correct:1},
+{q:"Melyik országban található a Colosseum?", a:["Görögország","Olaszország","Franciaország","Spanyolország"], correct:1},
+{q:"Mi a leghosszabb folyó a világon?", a:["Nílus","Amazon","Mississippi","Jangce"], correct:0},
+{q:"Ki volt az USA első elnöke?", a:["Abraham Lincoln","George Washington","Thomas Jefferson","John Adams"], correct:1},
+{q:"Mi a fotoszintézis fő terméke?", a:["O2","CO2","Víz","Cukor"], correct:3},
+{q:"Melyik évben indult a Facebook?", a:["2002","2004","2006","2008"], correct:1},
+{q:"Mi a kémiai jelölése a nátrium-kloridnak?", a:["NaCl","KCl","CaCl2","MgCl2"], correct:0},
+{q:"Ki volt a 'Szabadság szobor' tervezője?", a:["Gustave Eiffel","Frédéric Bartholdi","Rodin","Michelangelo"], correct:1},
+{q:"Mi a leghosszabb csont az emberi testben?", a:["Felkarcsont","Combcsont","Sípcsont","Ujjperc"], correct:1},
+{q:"Melyik országban van a Taj Mahal?", a:["India","Pakisztán","Nepál","Banglades"], correct:0},
+{q:"Ki volt az első női Nobel-díjas kémikus?", a:["Marie Curie","Rosalind Franklin","Dorothy Hodgkin","Ada Yonath"], correct:0},
+{q:"Mi a fővárosa Spanyolországnak?", a:["Barcelona","Madrid","Sevilla","Valencia"], correct:1},
+{q:"Ki volt az első női űrhajós?", a:["Valentina Tereshkova","Sally Ride","Mae Jemison","Eileen Collins"], correct:0},
+{q:"Mi a legmagasabb vízesés a világon?", a:["Niagara","Victoria","Angel","Iguazu"], correct:2},
+{q:"Mi a legkisebb ország a világon?", a:["Monaco","Vatikán","San Marino","Liechtenstein"], correct:1},
+{q:"Mi a legnagyobb kontinens?", a:["Afrika","Ázsia","Európa","Dél-Amerika"], correct:1},
+{q:"Melyik ország fővárosa London?", a:["USA","Nagy-Britannia","Kanada","Ausztrália"], correct:1},
+{q:"Mi a kémiai jele a szénnek?", a:["C","S","Co","Ca"], correct:0},
+{q:"Melyik országban található a Mount Kilimanjaro?", a:["Kenya","Tanzánia","Uganda","Etiópia"], correct:1},
+{q:"Mi a fővárosa Görögországnak?", a:["Athén","Szaloniki","Korfu","Patra"], correct:0},
+{q:"Melyik ország zászlaján van a félhold és csillag?", a:["Törökország","Pakisztán","Algéria","Marokkó"], correct:0},
+{q:"Ki volt a híres görög filozófus, aki tanította Arisztotelészt?", a:["Platón","Szókratész","Pitagorasz","Epikurosz"], correct:0},
+{q:"Mi a legnagyobb emlős a világon?", a:["Elefánt","Bálna","Rhinocerosz","Gorilla"], correct:1},
+{q:"Melyik ország zászlaján van a maple leaf (juharlevél)?", a:["USA","Kanada","Ausztrália","Új-Zéland"], correct:1},
+{q:"Ki fedezte fel Amerikát 1492-ben?", a:["Columbus","Magellan","Vasco da Gama","Ferdinand von Zeppelin"], correct:0},
+{q:"Melyik állat híres a lassúságáról?", a:["Oroszlán","Tengeri teknős","Lajhár","Elefánt"], correct:2},
+{q:"Melyik országban található a Great Barrier Reef?", a:["USA","Ausztrália","Brazília","Dél-Afrika"], correct:1},
+{q:"Ki volt a híres német fizikus, aki a relativitáselméletet kidolgozta?", a:["Newton","Einstein","Galileo","Tesla"], correct:1},
+{q:"Mi a legkisebb csont az emberi testben?", a:["Üllőcsont","Lábujjperc","Felkarcsont","Sípcsont"], correct:0},
+{q:"Melyik ország híres a sakkról?", a:["India","Oroszország","Kína","USA"], correct:0},
+{q:"Melyik ország zászlaján van vörös-fehér kereszt?", a:["Svájc","Anglia","Svédország","Dánia"], correct:0},
+{q:"Mi a legkisebb kontinens?", a:["Ausztrália","Európa","Antarktisz","Dél-Amerika"], correct:0},
+{q:"Mi a fővárosa Kanadának?", a:["Toronto","Vancouver","Ottawa","Montreal"], correct:2},
+{q:"Melyik ország fővárosa Madrid?", a:["Portugália","Spanyolország","Olaszország","Franciaország"], correct:1},
+{q:"Melyik bolygón van a Nagy Vörös Folt?", a:["Jupiter","Szaturnusz","Mars","Vénusz"], correct:0},
+{q:"Mi a leggyorsabb szárazföldi állat?", a:["Oroszlán","Tigris","Cheetah","Leopárd"], correct:2},
+{q:"Melyik országban található a Serengeti Nemzeti Park?", a:["Tanzánia","Kenya","Dél-Afrika","Uganda"], correct:0},
+{q:"Ki festette a 'Sziklás Madonna' című képet?", a:["Raphael","Michelangelo","Leonardo da Vinci","Titian"], correct:0},
+{q:"Melyik kontinensen található az Amazonas?", a:["Afrika","Dél-Amerika","Ázsia","Európa"], correct:1},
+{q:"Mi a leghíresebb piramis Egyiptomban?", a:["Dzsószer-piramis","Kheopsz-piramis","Kefren-piramis","Mikonosz-piramis"], correct:1},
+{q:"Melyik ország zászlaján van vörös sárkány?", a:["Wales","Kína","Bhután","Japán"], correct:0},
+{q:"Ki írta a 'Macbeth'-et?", a:["Shakespeare","Goethe","Dante","Tolstoy"], correct:0},
+{q:"Melyik országban található a Stonehenge?", a:["Skócia","Anglia","Írország","Franciaország"], correct:1},
+{q:"Mi a legkisebb ország a világon?", a:["Monaco","Vatikán","San Marino","Liechtenstein"], correct:1},
+{q:"Mi a legnagyobb édesvízi tó a világon?", a:["Tanganjika-tó","Huron-tó","Michigan-tó","Balaton"], correct:1},
+{q:"Melyik ország fővárosa Berlin?", a:["Ausztria","Németország","Svájc","Hollandia"], correct:1},
+{q:"Mi a kémiai jele az aranynak?", a:["Au","Ag","Fe","Hg"], correct:0},
+{q:"Ki volt az első ember a Holdon?", a:["Neil Armstrong","Yuri Gagarin","Buzz Aldrin","John Glenn"], correct:0},
+{q:"Melyik ország híres a sushiról?", a:["Kína","Japán","Korea","Thaiföld"], correct:1},
+{q:"Mi a legnagyobb kontinens?", a:["Afrika","Ázsia","Európa","Dél-Amerika"], correct:1},
+{q:"Mi a fővárosa Lengyelországnak?", a:["Varsó","Krakó","Gdansk","Poznan"], correct:0},
+{q:"Melyik évben ért véget a II. világháború?", a:["1944","1945","1946","1947"], correct:1},
+{q:"Ki festette a 'Csillagos éj' című festményt?", a:["Van Gogh","Monet","Picasso","Renoir"], correct:0},
+{q:"Melyik országban található a Fuji-hegy?", a:["Kína","Japán","Korea","Nepál"], correct:1},
+{q:"Mi a kémiai jele a hidrogénnek?", a:["H","He","Hd","Hg"], correct:0},
+{q:"Ki írta a 'Hamlet'-et?", a:["Shakespeare","Goethe","Dante","Tolstoy"], correct:0},
+{q:"Melyik ország híres a tulipánmezőiről?", a:["Hollandia","Németország","Belgium","Franciaország"], correct:0},
+{q:"Mi a legkisebb bolygó a Naprendszerben?", a:["Merkúr","Mars","Plútó","Vénusz"], correct:0},
+{q:"Ki volt az USA elnöke 2001 és 2009 között?", a:["George W. Bush","Bill Clinton","Barack Obama","Donald Trump"], correct:0},
+{q:"Melyik ország zászlaján van a yin-yang szimbólum?", a:["Korea","Kína","Japán","Tajvan"], correct:0},
+{q:"Mi a leggyorsabb állat a vízben?", a:["Delfin","Cápa","Sárkányhal","Tengeri sügér"], correct:1},
+{q:"Ki írta a 'Brave New World'-öt?", a:["Aldous Huxley","Orwell","Tolstoy","Kafka"], correct:0},
+{q:"Melyik országban található a Petra város?", a:["Jordánia","Szaúd-Arábia","Egyiptom","Marokkó"], correct:0},
+{q:"Mi a fővárosa Izlandnak?", a:["Reykjavík","Oslo","Helsinki","Stockholm"], correct:0},
+{q:"Melyik évben robbant fel a Csernobili atomerőmű?", a:["1984","1986","1988","1990"], correct:1},
+{q:"Mi a legnagyobb sivatag a világon?", a:["Sahara","Gobi","Kalahari","Arab-sivatag"], correct:0},
+{q:"Ki volt az első ember az űrben?", a:["Neil Armstrong","Yuri Gagarin","Buzz Aldrin","John Glenn"], correct:1},
+{q:"Melyik ország fővárosa Prága?", a:["Csehország","Szlovákia","Lengyelország","Ausztria"], correct:0},
+{q:"Mi a kémiai jele a káliumnak?", a:["K","Ka","Kn","Pt"], correct:0},
+{q:"Ki írta a 'Jane Eyre'-t?", a:["Charlotte Brontë","Jane Austen","Emily Brontë","Mary Shelley"], correct:0},
+{q:"Melyik ország zászlaján van a csillagok középpontban?", a:["USA","Kína","EU","Ausztrália"], correct:1},
+{q:"Mi a legmagasabb hegy Afrikában?", a:["Kilimandzsáró","Kenya","Atlasz","Rwenzori"], correct:0},
+{q:"Melyik bolygó a Naprendszerben a legkisebb?", a:["Merkúr","Mars","Plútó","Vénusz"], correct:0},
+{q:"Mi a fővárosa Svájcnak?", a:["Bern","Zurich","Genf","Basel"], correct:0},
+{q:"Ki volt az első női Nobel-díjas?", a:["Marie Curie","Rosalind Franklin","Jane Goodall","Ada Lovelace"], correct:0},
+{q:"Mi a fővárosa Ausztriának?", a:["Bécs","Salzburg","Innsbruck","Graz"], correct:0},
+{q:"Melyik állat a legnagyobb a világon?", a:["Elefánt","Bálna","Rhinocerosz","Gorilla"], correct:1},
+{q:"Melyik évben kezdődött a Francia forradalom?", a:["1787","1789","1791","1793"], correct:1},
+{q:"Ki festette a 'Mona Lisát'?", a:["Leonardo da Vinci","Michelangelo","Raphael","Titian"], correct:0},
+{q:"Melyik ország fővárosa Athén?", a:["Görögország","Törökország","Bulgária","Szerbia"], correct:0},
+{q:"Mi a kémiai jele az ezüstnek?", a:["Ag","Au","Pt","Hg"], correct:0},
+{q:"Ki volt az első ember a Holdon?", a:["Neil Armstrong","Yuri Gagarin","Buzz Aldrin","John Glenn"], correct:0},
+{q:"Melyik ország híres a ramen tésztáról?", a:["Japán","Kína","Korea","Thaiföld"], correct:0},
+{q:"Mi a legnagyobb édesvízi tó Afrikában?", a:["Victoria-tó","Tanganjika-tó","Malawi-tó","Nílus-tó"], correct:0},
+{q:"Ki írta a 'Animal Farm'-ot?", a:["George Orwell","Aldous Huxley","Tolstoy","Kafka"], correct:0},
+{q:"Melyik ország fővárosa Bécs?", a:["Ausztria","Németország","Svácj","Csehország"], correct:0},
+{q:"Melyik országban található a Colosseum?", a:["Olaszország","Görögország","Franciaország","Spanyolország"], correct:0},
+{q:"Mi a leghosszabb folyó Ázsiában?", a:["Jangce","Nílus","Mississippi","Amazon"], correct:0},
+{q:"Ki volt az USA első elnöke?", a:["George Washington","Abraham Lincoln","Thomas Jefferson","John Adams"], correct:0},
+{q:"Mi a fotoszintézis fő terméke?", a:["Cukor","O2","CO2","Víz"], correct:0},
+{q:"Melyik évben indult a YouTube?", a:["2004","2005","2006","2007"], correct:1},
+{q:"Mi a kémiai jele a nátrium-kloridnak?", a:["NaCl","KCl","CaCl2","MgCl2"], correct:0},
+{q:"Ki tervezte a Szabadság-szobrot?", a:["Frédéric Bartholdi","Gustave Eiffel","Rodin","Michelangelo"], correct:0},
+{q:"Mi a leghosszabb csont az emberi testben?", a:["Combcsont","Felkarcsont","Sípcsont","Ujjperc"], correct:0},
+{q:"Melyik országban található a Taj Mahal?", a:["India","Pakisztán","Nepál","Banglades"], correct:0},
+{q:"Ki volt az első női Nobel-díjas kémikus?", a:["Marie Curie","Dorothy Hodgkin","Ada Yonath","Rosalind Franklin"], correct:0},
+{q:"Mi a fővárosa Spanyolországnak?", a:["Madrid","Barcelona","Sevilla","Valencia"], correct:0},
+{q:"Ki volt az első női űrhajós?", a:["Valentina Tereshkova","Sally Ride","Mae Jemison","Eileen Collins"], correct:0},
+{q:"Mi a legmagasabb vízesés a világon?", a:["Angel","Niagara","Victoria","Iguazu"], correct:0},
+{q:"Mi a legkisebb ország a világon?", a:["Vatikán","Monaco","San Marino","Liechtenstein"], correct:0},
+{q:"Mi a legnagyobb kontinens?", a:["Ázsia","Afrika","Európa","Dél-Amerika"], correct:0},
+{q:"Melyik ország fővárosa London?", a:["Nagy-Britannia","USA","Kanada","Ausztrália"], correct:0},
+{q:"Mi a kémiai jele a szénnek?", a:["C","S","Co","Ca"], correct:0},
+{q:"Melyik országban található a Mount Kilimanjaro?", a:["Tanzánia","Kenya","Uganda","Etiópia"], correct:0},
+{q:"Mi a fővárosa Görögországnak?", a:["Athén","Szaloniki","Korfu","Patra"], correct:0},
+{q:"Melyik ország zászlaján van a félhold és csillag?", a:["Törökország","Pakisztán","Algéria","Marokkó"], correct:0},
+{q:"Ki volt a híres görög filozófus, aki tanította Arisztotelészt?", a:["Platón","Szókratész","Pitagorasz","Epikurosz"], correct:0},
+{q:"Mi a legnagyobb emlős a világon?", a:["Bálna","Elefánt","Rhinocerosz","Gorilla"], correct:0},
+{q:"Melyik ország zászlaján van a maple leaf (juharlevél)?", a:["Kanada","USA","Ausztrália","Új-Zéland"], correct:0},
+{q:"Ki fedezte fel Amerikát 1492-ben?", a:["Columbus","Magellan","Vasco da Gama","Ferdinand von Zeppelin"], correct:0},
+{q:"Melyik állat híres a lassúságáról?", a:["Lajhár","Oroszlán","Tengeri teknős","Elefánt"], correct:0},
+{q:"Melyik országban található a Great Barrier Reef?", a:["Ausztrália","USA","Brazília","Dél-Afrika"], correct:0},
+{q:"Ki volt a híres német fizikus, aki a relativitáselméletet kidolgozta?", a:["Einstein","Newton","Galileo","Tesla"], correct:0},
+{q:"Mi a legkisebb csont az emberi testben?", a:["Üllőcsont","Lábujjperc","Felkarcsont","Sípcsont"], correct:0},
+{q:"Melyik ország híres a sakkról?", a:["India","Oroszország","Kína","USA"], correct:0},
+{q:"Melyik ország zászlaján van vörös-fehér kereszt?", a:["Svájc","Anglia","Svédország","Dánia"], correct:0},
+{q:"Mi a legkisebb kontinens?", a:["Ausztrália","Európa","Antarktisz","Dél-Amerika"], correct:0},
+{q:"Mi a fővárosa Kanadának?", a:["Ottawa","Toronto","Vancouver","Montreal"], correct:0},
+{q:"Melyik bolygón van a Nagy Vörös Folt?", a:["Jupiter","Szaturnusz","Mars","Vénusz"], correct:0},
+{q:"Mi a leggyorsabb szárazföldi állat?", a:["Cheetah","Oroszlán","Tigris","Leopárd"], correct:0},
+{q:"Melyik országban található a Serengeti Nemzeti Park?", a:["Tanzánia","Kenya","Dél-Afrika","Uganda"], correct:0},
+{q:"Ki festette a 'Sziklás Madonna' című képet?", a:["Raphael","Michelangelo","Leonardo da Vinci","Titian"], correct:0},
+{q:"Melyik kontinensen található az Amazonas?", a:["Dél-Amerika","Afrika","Ázsia","Európa"], correct:0},
+{q:"Mi a leghíresebb piramis Egyiptomban?", a:["Kheopsz-piramis","Dzsószer-piramis","Kefren-piramis","Mikonosz-piramis"], correct:0},
+{q:"Ki írta a 'Macbeth'-et?", a:["Shakespeare","Goethe","Dante","Tolstoy"], correct:0},
+{q:"Melyik országban található a Stonehenge?", a:["Anglia","Skócia","Írország","Franciaország"], correct:0},
+{q:"Ki alakította Tony Starkot a Marvel filmekben?", a:["Robert Downey Jr.","Chris Evans","Mark Ruffalo","Chris Hemsworth"], correct:0},
+{q:"Melyik évben jelent meg az első 'Harry Potter' könyv?", a:["1997","1999","2000","1995"], correct:0},
+{q:"Melyik énekes énekli a 'Thriller'-t?", a:["Michael Jackson","Prince","Elvis Presley","Freddie Mercury"], correct:0},
+{q:"Ki rendezte a 'Jurassic Park'-ot?", a:["Steven Spielberg","James Cameron","Peter Jackson","Ridley Scott"], correct:0},
+{q:"Melyik országban született Adele?", a:["Egyesült Királyság","USA","Ausztrália","Kanada"], correct:0},
+{q:"Melyik csapat nyerte a 2022-es FIFA világbajnokságot?", a:["Argentína","Franciaország","Brazília","Németország"], correct:0},
+{q:"Ki volt a 'Friends' sorozat Rachel-je?", a:["Jennifer Aniston","Courteney Cox","Lisa Kudrow","Maggie Wheeler"], correct:0},
+{q:"Melyik Marvel filmben debütált először Spider-Man a mozivásznon?", a:["Captain America: Civil War","Iron Man","Spider-Man: Homecoming","Avengers: Infinity War"], correct:0},
+{q:"Melyik zenekar adta ki a 'Bohemian Rhapsody'-t?", a:["Queen","The Beatles","Led Zeppelin","Pink Floyd"], correct:0},
+{q:"Melyik énekes adta ki a 'Shape of You'-t?", a:["Ed Sheeran","Justin Bieber","Shawn Mendes","Sam Smith"], correct:0},
+{q:"Melyik sorozatban szerepel Jon Snow?", a:["Game of Thrones","Vikings","The Witcher","Breaking Bad"], correct:0},
+{q:"Ki nyerte a 2021-es NBA döntőt?", a:["Milwaukee Bucks","Los Angeles Lakers","Golden State Warriors","Brooklyn Nets"], correct:0},
+{q:"Melyik évben jelent meg az első iPhone?", a:["2007","2005","2008","2006"], correct:0},
+{q:"Ki alakította Jack Sparrow kapitányt a 'Pirates of the Caribbean'-ben?", a:["Johnny Depp","Orlando Bloom","Geoffrey Rush","Ian McShane"], correct:0},
+{q:"Melyik énekes énekli a 'Rolling in the Deep'-et?", a:["Adele","Beyoncé","Rihanna","Taylor Swift"], correct:0},
+{q:"Melyik ország rendezte a 2018-as FIFA világbajnokságot?", a:["Oroszország","Brazília","Németország","Franciaország"], correct:0},
+{q:"Ki írta a 'Percy Jackson' könyvsorozatot?", a:["Rick Riordan","J.K. Rowling","Suzanne Collins","C.S. Lewis"], correct:0},
+{q:"Melyik sorozatban szerepel Walter White?", a:["Breaking Bad","Better Call Saul","The Sopranos","Mad Men"], correct:0},
+{q:"Ki rendezte a 'Titanic'-ot?", a:["James Cameron","Steven Spielberg","Peter Jackson","Christopher Nolan"], correct:0},
+{q:"Melyik film nyerte a 2020-as Oscar legjobb film díját?", a:["Parasite","1917","Joker","Once Upon a Time in Hollywood"], correct:0},
+{q:"Melyik csapat nyerte a 2022-es NBA döntőt?", a:["Golden State Warriors","Boston Celtics","Miami Heat","Milwaukee Bucks"], correct:0},
+{q:"Ki énekli a 'Bad Guy'-t?", a:["Billie Eilish","Ariana Grande","Dua Lipa","Katy Perry"], correct:0},
+{q:"Melyik sorozatban szerepel Eleven?", a:["Stranger Things","The Umbrella Academy","Riverdale","Dark"], correct:0},
+{q:"Ki alakította Joker-t a 2019-es filmben?", a:["Joaquin Phoenix","Heath Ledger","Jared Leto","Jack Nicholson"], correct:0},
+{q:"Melyik évben jelent meg a 'Game of Thrones' első évada?", a:["2011","2010","2012","2013"], correct:0},
+{q:"Melyik filmről szól a 'The Avengers'?", a:["Marvel szuperhősök","DC szuperhősök","Star Wars","X-Men"], correct:0},
+{q:"Ki játszotta a főszerepet a 'Forrest Gump'-ban?", a:["Tom Hanks","Leonardo DiCaprio","Brad Pitt","Matt Damon"], correct:0},
+{q:"Melyik énekesnő adta ki a 'Like a Prayer'-t?", a:["Madonna","Britney Spears","Christina Aguilera","Lady Gaga"], correct:0},
+{q:"Ki rendezte a 'Inception'-t?", a:["Christopher Nolan","Steven Spielberg","James Cameron","Quentin Tarantino"], correct:0},
+{q:"Melyik ország rendezte a 2006-os FIFA világbajnokságot?", a:["Németország","Olaszország","Franciaország","Brazília"], correct:0},
+{q:"Ki játszotta a főszerepet a 'Gladiátor'-ban?", a:["Russell Crowe","Brad Pitt","Tom Cruise","Leonardo DiCaprio"], correct:0},
+{q:"Melyik zenekar adta ki a 'Smells Like Teen Spirit'-et?", a:["Nirvana","Pearl Jam","Soundgarden","Alice in Chains"], correct:0},
+{q:"Melyik sorozatban szerepel Daenerys Targaryen?", a:["Game of Thrones","Vikings","The Witcher","Stranger Things"], correct:0},
+{q:"Ki énekli a 'Hello'-t?", a:["Adele","Beyoncé","Taylor Swift","Rihanna"], correct:0},
+{q:"Melyik évben jelent meg a 'The Dark Knight'?", a:["2008","2005","2010","2007"], correct:0},
+{q:"Ki rendezte a 'Pulp Fiction'-t?", a:["Quentin Tarantino","Steven Spielberg","James Cameron","Martin Scorsese"], correct:0},
+{q:"Melyik ország rendezte a 2014-es FIFA világbajnokságot?", a:["Brazília","Németország","Oroszország","Spanyolország"], correct:0},
+{q:"Ki alakította Iron Man-t a Marvel filmekben?", a:["Robert Downey Jr.","Chris Hemsworth","Chris Evans","Mark Ruffalo"], correct:0},
+{q:"Melyik sorozatban szerepel Sherlock Holmes?", a:["Sherlock","Elementary","House","Luther"], correct:0},
+{q:"Ki játszotta a főszerepet a 'The Wolf of Wall Street'-ben?", a:["Leonardo DiCaprio","Brad Pitt","Matt Damon","Johnny Depp"], correct:0},
+{q:"Melyik zenekar adta ki a 'Stairway to Heaven'-t?", a:["Led Zeppelin","The Beatles","Pink Floyd","Queen"], correct:0},
+{q:"Ki énekli a 'Bad Romance'-t?", a:["Lady Gaga","Madonna","Britney Spears","Ariana Grande"], correct:0},
+{q:"Melyik filmben szerepel Neo karaktere?", a:["Mátrix","Inception","Avatar","Star Wars"], correct:0},
+{q:"Ki rendezte a 'Avatar'-t?", a:["James Cameron","Steven Spielberg","Christopher Nolan","Peter Jackson"], correct:0},
+{q:"Melyik ország rendezte a 2010-es FIFA világbajnokságot?", a:["Dél-Afrika","Brazília","Németország","Olaszország"], correct:0},
+{q:"Ki játszotta a főszerepet a 'Pirates of the Caribbean'-ben?", a:["Johnny Depp","Orlando Bloom","Geoffrey Rush","Ian McShane"], correct:0},
+{q:"Melyik énekes adta ki a 'Blinding Lights'-t?", a:["The Weeknd","Drake","Justin Bieber","Shawn Mendes"], correct:0},
+{q:"Melyik sorozatban szerepel Walter White?", a:["Breaking Bad","Better Call Saul","The Sopranos","Mad Men"], correct:0},
+{q:"Ki rendezte a 'Django Unchained'-et?", a:["Quentin Tarantino","Martin Scorsese","Steven Spielberg","James Cameron"], correct:0},
+{q:"Melyik film nyerte a legjobb animációs Oscar díjat 2019-ben?", a:["Spider-Man: Into the Spider-Verse","Incredibles 2","Coco","Ralph Breaks the Internet"], correct:0},
+{q:"Ki játszotta a főszerepet a 'Fight Club'-ban?", a:["Brad Pitt","Edward Norton","Tom Cruise","Leonardo DiCaprio"], correct:0},
+{q:"Melyik zenekar adta ki a 'Hey Jude'-ot?", a:["The Beatles","The Rolling Stones","Queen","Pink Floyd"], correct:0},
+{q:"Ki énekli a 'Someone Like You'-t?", a:["Adele","Beyoncé","Rihanna","Taylor Swift"], correct:0},
+{q:"Melyik sorozatban szerepel Jon Snow?", a:["Game of Thrones","Vikings","The Witcher","Stranger Things"], correct:0},
+{q:"Ki rendezte a 'The Shining'-et?", a:["Stanley Kubrick","Alfred Hitchcock","Steven Spielberg","James Cameron"], correct:0},
+{q:"Melyik országban rendezik a Tour de France kerékpárversenyt?", a:["Franciaország","Olaszország","Spanyolország","Belgium"], correct:0},
+{q:"Ki játszotta a főszerepet a 'Inception'-ben?", a:["Leonardo DiCaprio","Joseph Gordon-Levitt","Tom Hardy","Cillian Murphy"], correct:0},
+{q:"Melyik énekes adta ki a 'Uptown Funk'-ot?", a:["Bruno Mars","Justin Timberlake","Pharrell Williams","Ed Sheeran"], correct:0},
+{q:"Melyik sorozatban szerepel Piper Chapman?", a:["Orange is the New Black","Breaking Bad","The Handmaid's Tale","Stranger Things"], correct:0},
+{q:"Ki rendezte a 'Shutter Island'-t?", a:["Martin Scorsese","Steven Spielberg","Christopher Nolan","James Cameron"], correct:0},
+{q:"Melyik ország rendezte a 2002-es FIFA világbajnokságot?", a:["Dél-Korea és Japán","Németország","Brazília","Franciaország"], correct:0},
+{q:"Ki játszotta a főszerepet a 'The Revenant'-ben?", a:["Leonardo DiCaprio","Tom Hardy","Brad Pitt","Matt Damon"], correct:0},
+{q:"Melyik zenekar adta ki a 'Hotel California'-t?", a:["Eagles","The Beatles","Queen","Pink Floyd"], correct:0},
+{q:"Ki énekli a 'Shallow'-t a 'A Star is Born'-ból?", a:["Lady Gaga","Beyoncé","Taylor Swift","Adele"], correct:0},
+{q:"Melyik sorozatban szerepel Rick Grimes?", a:["The Walking Dead","Breaking Bad","Game of Thrones","Stranger Things"], correct:0},
+{q:"Ki rendezte a 'The Wolf of Wall Street'-et?", a:["Martin Scorsese","Steven Spielberg","Quentin Tarantino","James Cameron"], correct:0},
+{q:"Melyik ország rendezte a 1998-as FIFA világbajnokságot?", a:["Franciaország","Brazília","Olaszország","Németország"], correct:0},
+{q:"Ki játszotta a főszerepet a 'The Matrix'-ban?", a:["Keanu Reeves","Laurence Fishburne","Hugo Weaving","Carrie-Anne Moss"], correct:0},
+{q:"Melyik énekes adta ki a 'Can’t Stop the Feeling!'-t?", a:["Justin Timberlake","Bruno Mars","Ed Sheeran","Shawn Mendes"], correct:0},
+{q:"Melyik sorozatban szerepel Buffy Summers?", a:["Buffy the Vampire Slayer","Charmed","Angel","Supernatural"], correct:0},
+{q:"Ki rendezte a 'Gravity'-t?", a:["Alfonso Cuarón","Christopher Nolan","James Cameron","Steven Spielberg"], correct:0},
+{q:"Melyik ország rendezte a 2000-es Sydney olimpiát?", a:["Ausztrália","USA","Kína","Görögország"], correct:0},
+{q:"Ki játszotta a főszerepet a 'Black Swan'-ban?", a:["Natalie Portman","Mila Kunis","Winona Ryder","Barbara Hershey"], correct:0},
+{q:"Melyik zenekar adta ki a 'Sweet Child o' Mine'-t?", a:["Guns N' Roses","Nirvana","Metallica","AC/DC"], correct:0},
+{q:"Ki énekli a 'Rolling in the Deep'-et?", a:["Adele","Beyoncé","Rihanna","Taylor Swift"], correct:0},
+{q:"Melyik sorozatban szerepel Tyrion Lannister?", a:["Game of Thrones","Vikings","The Witcher","Stranger Things"], correct:0},
+{q:"Ki rendezte a 'The Grand Budapest Hotel'-t?", a:["Wes Anderson","Steven Spielberg","Quentin Tarantino","Martin Scorsese"], correct:0},
+{q:"Melyik ország rendezte a 2016-os Rio olimpiát?", a:["Brazília","USA","Oroszország","Kína"], correct:0},
+{q:"Ki játszotta a főszerepet a 'La La Land'-ben?", a:["Ryan Gosling","Bradley Cooper","Ryan Reynolds","Leonardo DiCaprio"], correct:0},
+{q:"Melyik zenekar adta ki a 'Imagine'-t?", a:["John Lennon","The Beatles","Queen","Pink Floyd"], correct:0},
+{q:"Ki énekli a 'Hello' című dalt?", a:["Adele","Taylor Swift","Beyoncé","Rihanna"], correct:0},
+{q:"Melyik sorozatban szerepel Sheldon Cooper?", a:["The Big Bang Theory","Friends","How I Met Your Mother","Modern Family"], correct:0},
+{q:"Ki rendezte a 'Once Upon a Time in Hollywood'-ot?", a:["Quentin Tarantino","Steven Spielberg","Christopher Nolan","James Cameron"], correct:0},
+{q:"Melyik ország rendezte a 2008-as Peking olimpiát?", a:["Kína","USA","Olaszország","Görögország"], correct:0},
+{q:"Ki játszotta a főszerepet a 'Joker'-ben?", a:["Joaquin Phoenix","Heath Ledger","Jared Leto","Jack Nicholson"], correct:0},
+{q:"Melyik zenekar adta ki a 'Livin’ on a Prayer'-t?", a:["Bon Jovi","Queen","AC/DC","Nirvana"], correct:0},
+{q:"Ki énekli a 'Bad Guy'-t?", a:["Billie Eilish","Ariana Grande","Dua Lipa","Katy Perry"], correct:0},
+{q:"Melyik bolygó a Naphoz legközelebb esik?", a:["Merkúr","Vénusz","Föld","Mars"], correct:0},
+{q:"Ki volt az első ember a Holdon?", a:["Neil Armstrong","Buzz Aldrin","Yuri Gagarin","Michael Collins"], correct:0},
+{q:"Melyik ország fővárosa Bécs?", a:["Ausztria","Németország","Svájc","Magyarország"], correct:0},
+{q:"Melyik évben kezdődött a II. világháború?", a:["1939","1914","1945","1937"], correct:0},
+{q:"Melyik a legnagyobb óceán a Földön?", a:["Csendes-óceán","Atlanti-óceán","Indiai-óceán","Északi-óceán"], correct:0},
+{q:"Mi az emberi test legnagyobb szerve?", a:["Bőr","Máj","Tüdő","Szív"], correct:0},
+{q:"Ki festette a 'Mona Lisát'?", a:["Leonardo da Vinci","Michelangelo","Raphael","Caravaggio"], correct:0},
+{q:"Melyik elem szimbóluma az O2?", a:["Oxigén","Nitrogén","Hidrogén","Szén"], correct:0},
+{q:"Melyik országban található a Machu Picchu?", a:["Peru","Chile","Brazília","Argentína"], correct:0},
+{q:"Mi a fénysebesség a vákuumban kb?", a:["300 000 km/s","150 000 km/s","1 000 000 km/s","30 000 km/s"], correct:0},
+{q:"Ki írta a 'Rómeó és Júlia'-t?", a:["William Shakespeare","Charles Dickens","Jane Austen","Mark Twain"], correct:0},
+{q:"Melyik kontinensen található Szahara sivatag?", a:["Afrika","Ázsia","Ausztrália","Észak-Amerika"], correct:0},
+{q:"Mi a víz kémiai képlete?", a:["H2O","CO2","NaCl","O2"], correct:0},
+{q:"Melyik országban van a Nagy-korallzátony?", a:["Ausztrália","USA","Brazília","Dél-Afrika"], correct:0},
+{q:"Ki volt Magyarország első királya?", a:["Szent István","Mátyás király","IV. Béla","Károly Róbert"], correct:0},
+{q:"Melyik évben omlott le a berlini fal?", a:["1989","1991","1987","1990"], correct:0},
+{q:"Melyik bolygón van a Nagy Vörös Folt?", a:["Jupiter","Mars","Saturnusz","Vénusz"], correct:0},
+{q:"Mi a legnagyobb állat a Földön?", a:["Kék bálna","Elefánt","Bálnadelfin","Nílusi krokodil"], correct:0},
+{q:"Ki volt az USA első elnöke?", a:["George Washington","Abraham Lincoln","Thomas Jefferson","John Adams"], correct:0},
+{q:"Melyik ország zászlaján van egy piros nap?", a:["Japán","Kína","Dél-Korea","Thaiföld"], correct:0},
+{q:"Mi az atommag töltése?", a:["Pozitív","Negatív","Semleges","Vegyes"], correct:0},
+{q:"Melyik évben fedezte fel Kolumbusz Amerikát?", a:["1492","1490","1500","1485"], correct:0},
+{q:"Mi a Föld legmélyebb pontja?", a:["Mariana-árok","Gibraltári-szoros","Nílus mélye","Grand Canyon"], correct:0},
+{q:"Ki írta a 'Háború és béke'-t?", a:["Lev Tolsztoj","Fjodor Dosztojevszkij","Anton Pavlovics Csehov","Ivan Turgenyev"], correct:0},
+{q:"Melyik országban található a Kilimandzsáró?", a:["Tanzánia","Kenya","Uganda","Egyiptom"], correct:0},
+{q:"Mi az emberi test legkisebb csontja?", a:["Üllőcsont","Kalapács csont","Sarkcsont","Lapocka"], correct:0},
+{q:"Ki fedezte fel a gravitáció törvényét?", a:["Isaac Newton","Albert Einstein","Galileo Galilei","Nikola Tesla"], correct:0},
+{q:"Melyik ország fővárosa Budapest?", a:["Magyarország","Ausztria","Szlovákia","Románia"], correct:0},
+{q:"Mi az első elem a periódusos rendszerben?", a:["Hidrogén","Hélium","Oxygen","Nitrogén"], correct:0},
+{q:"Melyik kontinensen van az Amazonas esőerdő?", a:["Dél-Amerika","Afrika","Ázsia","Észak-Amerika"], correct:0},
+{q:"Melyik magyar város híres a fürdőiről?", a:["Hévíz","Szeged","Debrecen","Pécs"], correct:0},
+{q:"Melyik évben kezdődött az I. világháború?", a:["1914","1918","1939","1905"], correct:0},
+{q:"Mi a Föld legnagyobb sivataga?", a:["Sahara","Gobi","Kalahári","Arab-sivatag"], correct:0},
+{q:"Ki írta a '1984' című regényt?", a:["George Orwell","Aldous Huxley","Ray Bradbury","Jules Verne"], correct:0},
+{q:"Melyik bolygót nevezik vörös bolygónak?", a:["Mars","Vénusz","Jupiter","Merkúr"], correct:0},
+{q:"Melyik ország fővárosa Lisszabon?", a:["Portugália","Spanyolország","Olaszország","Franciaország"], correct:0},
+{q:"Mi az elemi részecske neve, ami negatív töltésű?", a:["Elektron","Proton","Neutron","Fotonn"], correct:0},
+{q:"Ki volt az ókori Egyiptom legismertebb fáraója?", a:["Tutanhamon","Ramszesz II","Kheopsz","Hatshepsut"], correct:0},
+{q:"Melyik országban található az Eiffel-torony?", a:["Franciaország","Olaszország","Spanyolország","Belgium"], correct:0},
+{q:"Mi a Naprendszer legnagyobb bolygója?", a:["Jupiter","Szaturnusz","Föld","Mars"], correct:0},
+{q:"Ki volt az ókori görög filozófus, aki tanította Arisztotelészt?", a:["Platón","Szókratész","Pitagorasz","Epikurosz"], correct:0},
+{q:"Melyik évben jött létre az ENSZ?", a:["1945","1919","1939","1950"], correct:0},
+{q:"Mi a leggyakoribb elem a Föld légkörében?", a:["Nitrogén","Oxigén","Argon","Szén-dioxid"], correct:0},
+{q:"Melyik országban van a Taj Mahal?", a:["India","Pakisztán","Nepál","Banglades"], correct:0},
+{q:"Mi az emberi testben található legerősebb izom?", a:["Rágóizom","Szívizom","Combizom","Vádli"], correct:0},
+{q:"Ki írta a 'Don Quijote'-ot?", a:["Miguel de Cervantes","Victor Hugo","Mark Twain","Homer"], correct:0},
+{q:"Melyik országban található az Angkor Wat templom?", a:["Kambodzsa","Thaiföld","Laosz","Vietnam"], correct:0},
+{q:"Mi a leggyorsabb szárazföldi állat?", a:["Gepárd","Oroszlán","Tigris","Szervál"], correct:0},
+{q:"Ki volt a francia forradalom vezetője?", a:["Robespierre","Napóleon","Louis XVI","Danton"], correct:0},
+{q:"Melyik évben fedezték fel Amerikát?", a:["1492","1500","1480","1512"], correct:0},
+{q:"Mi a fény egysége?", a:["Lumen","Watt","Volt","Amper"], correct:0},
+{q:"Melyik országban található a Mount Everest?", a:["Nepál","India","Kína","Bhután"], correct:0},
+{q:"Ki írta a 'Hamlet'-et?", a:["William Shakespeare","John Milton","Geoffrey Chaucer","Oscar Wilde"], correct:0},
+{q:"Melyik földrajzi szélességi kör felel meg az Egyenlítőnek?", a:["0°","45°","90°","23,5°"], correct:0},
+{q:"Mi az emberi test legnagyobb belső szerve?", a:["Máj","Tüdő","Vese","Szív"], correct:0},
+{q:"Melyik évben kezdődött a hidegháború?", a:["1947","1945","1950","1939"], correct:0},
+{q:"Melyik ország fővárosa Stockholm?", a:["Svédország","Norvégia","Finnország","Dánia"], correct:0},
+{q:"Mi a Föld második legnagyobb kontinense?", a:["Afrika","Ázsia","Észak-Amerika","Dél-Amerika"], correct:0},
+{q:"Ki fedezte fel az Amerikát?", a:["Kolumbusz Kristóf","Vasco da Gama","Ferdinánd Magellán","James Cook"], correct:0},
+{q:"Melyik a legkisebb kontinens?", a:["Ausztrália","Európa","Antarktisz","Afrika"], correct:0},
+{q:"Mi az a fotoszintézis?", a:["A növények energiatermelése napfényből","A növények légzése","A talaj termékenyítése","A növények szaporodása"], correct:0},
+{q:"Melyik ország fővárosa Prága?", a:["Csehország","Szlovákia","Lengyelország","Magyarország"], correct:0},
+{q:"Ki volt a 'Nagy Sándor'?", a:["Makedón hadvezér","Római császár","Egyiptomi fáraó","Perzsa király"], correct:0},
+{q:"Mi a leggyakoribb gáz a Napban?", a:["Hidrogén","Hélium","Oxigén","Nitrogén"], correct:0},
+{q:"Melyik országban található a Sagrada Familia?", a:["Spanyolország","Olaszország","Portugália","Franciaország"], correct:0},
+{q:"Mi a Föld középpontjában található?", a:["Vas-nikkel mag","Víztömeg","Szén","Oxigén"], correct:0},
+{q:"Ki fedezte fel a radioaktivitást?", a:["Henri Becquerel","Marie Curie","Albert Einstein","Isaac Newton"], correct:0},
+{q:"Melyik évben oszlott fel a Szovjetunió?", a:["1991","1989","1990","1992"], correct:0},
+{q:"Mi az auróra borealis?", a:["Sarki fény","Vulkánkitörés","Földrengés","Óceáni áramlat"], correct:0},
+{q:"Melyik országban van a Niagara-vízesés?", a:["USA és Kanada","Mexikó","Brazília","Argentína"], correct:0},
+{q:"Mi a leggyorsabb vízi állat?", a:["Délkeleti uszonyos cápa","Delfin","Tengeri teknős","Barrakuda"], correct:0},
+{q:"Ki volt az első női Nobel-díjas?", a:["Marie Curie","Rosalind Franklin","Ada Lovelace","Elizabeth Blackburn"], correct:0},
+{q:"Melyik országban található a Petra ősi városa?", a:["Jordánia","Izrael","Egyiptom","Szíria"], correct:0},
+{q:"Mi a legnagyobb szerv az emberi testben?", a:["Bőr","Máj","Tüdő","Vese"], correct:0},
+{q:"Melyik évben jelent meg a Titanic hajó?", a:["1912","1905","1910","1915"], correct:0},
+{q:"Ki fedezte fel a penicillint?", a:["Alexander Fleming","Louis Pasteur","Robert Koch","Marie Curie"], correct:0},
+{q:"Melyik ország fővárosa Oslo?", a:["Norvégia","Svédország","Finnország","Dánia"], correct:0},
+{q:"Mi a legnagyobb bolygó a Naprendszerben?", a:["Jupiter","Szaturnusz","Föld","Mars"], correct:0},
+{q:"Ki írta a 'Macbeth'-et?", a:["William Shakespeare","Charles Dickens","Leo Tolstoy","Jane Austen"], correct:0},
+{q:"Melyik folyó a leghosszabb a világon?", a:["Nílus","Amazonas","Jangce","Mississippi"], correct:0},
+{q:"Melyik ország fővárosa Kairó?", a:["Egyiptom","Szaúd-Arábia","Líbia","Algéria"], correct:0},
+{q:"Mi a legkisebb csillag a Naprendszerünkben?", a:["Plútó (nem bolygó)","Merkúr","Mars","Vénusz"], correct:0},
+{q:"Ki volt az ókori Róma legismertebb hadvezére?", a:["Julius Caesar","Augustus","Nero","Cicero"], correct:0},
+{q:"Melyik évben alapították az Európai Uniót?", a:["1993","1957","2000","1985"], correct:0},
+{q:"Mi a földrajzi koordináta, ami az Északi-sarkot jelöli?", a:["90° É","0°","180°","45° É"], correct:0},
+{q:"Melyik országban található a Colosseum?", a:["Olaszország","Görögország","Spanyolország","Franciaország"], correct:0},
+{q:"Mi a legnagyobb emlős a szárazföldön?", a:["Afrikai elefánt","Indiai elefánt","Bálna","Rhinoceros"], correct:0},
+{q:"Ki volt a középkori Európa legismertebb orvosa?", a:["Avicenna","Galen","Hippokratész","Paracelsus"], correct:0},
+{q:"Melyik országban található a Galápagos-szigetek?", a:["Ecuador","Peru","Chile","Kolumbia"], correct:0},
+{q:"Mi az atommagban található semleges részecske neve?", a:["Neutron","Proton","Elektron","Fotonn"], correct:0},
+{q:"Melyik ország nyerte a 2018-as labdarúgó világbajnokságot?", a:["Franciaország","Horvátország","Brazília","Németország"], correct:0},
+{q:"Melyik sportágban használják a természtet: 'tee'?", a:["Golf","Röplabda","Tenisz","Kosárlabda"], correct:0},
+{q:"Ki a legtöbb Grand Slamet nyert férfi teniszező 2025-ig?", a:["Novak Djokovic","Rafael Nadal","Roger Federer","Pete Sampras"], correct:0},
+{q:"Melyik ország rendezte a 2016-os nyári olimpiát?", a:["Brazília","Kína","Anglia","Oroszország"], correct:0},
+{q:"Melyik sportágban található a 'slalom' versenyszám?", a:["Sí","Úszás","Atlétika","Kajak-kenu"], correct:0},
+{q:"Hány játékos van egy kosárlabda csapatban egyszerre a pályán?", a:["5","6","7","4"], correct:0},
+{q:"Melyik ország a futball Premier League otthona?", a:["Anglia","Spanyolország","Olaszország","Németország"], correct:0},
+{q:"Melyik sporthoz kapcsolódik a 'spike' kifejezés?", a:["Röplabda","Tenisz","Asztalitenisz","Labdarúgás"], correct:0},
+{q:"Melyik sportágban van a Tour de France?", a:["Kerékpározás","Futás","Úszás","Sífutás"], correct:0},
+{q:"Ki nyerte a 2023-as Forma-1 világbajnokságot?", a:["Max Verstappen","Lewis Hamilton","Charles Leclerc","Sergio Pérez"], correct:0},
+{q:"Melyik sportban van 'scrum'?", a:["Rugby","Kosárlabda","Labdarúgás","Jégkorong"], correct:0},
+{q:"Melyik ország nyerte a legtöbb olimpiai aranyérmet 2020-ig?", a:["USA","Kína","Németország","Oroszország"], correct:0},
+{q:"Melyik sportban használják a 'racket' kifejezést?", a:["Tenisz","Kosárlabda","Röplabda","Labdarúgás"], correct:0},
+{q:"Melyik sportágban van a 'home run'?", a:["Baseball","Kricket","Röplabda","Jégkorong"], correct:0},
+{q:"Hány perc egy profi labdarúgó mérkőzés?", a:["90","60","120","75"], correct:0},
+{q:"Ki a legismertebb argentin labdarúgó, aki 2022-ben világbajnok lett?", a:["Lionel Messi","Diego Maradona","Sergio Agüero","Paulo Dybala"], correct:0},
+{q:"Melyik sportban van a 'free throw'?", a:["Kosárlabda","Röplabda","Labdarúgás","Tenisz"], correct:0},
+{q:"Melyik országban jött létre a jégkorong?", a:["Kanada","USA","Oroszország","Svédország"], correct:0},
+{q:"Melyik sportágban van a 'puck'?", a:["Jégkorong","Rugby","Kricket","Lacrosse"], correct:0},
+{q:"Melyik sportban használják a 'offside' szabályt?", a:["Labdarúgás","Kosárlabda","Röplabda","Tenisz"], correct:0},
+{q:"Ki nyerte a 2023-as NBA bajnokságot?", a:["Denver Nuggets","Golden State Warriors","Boston Celtics","Milwaukee Bucks"], correct:0},
+{q:"Melyik sporthoz kapcsolódik a 'touchdown' kifejezés?", a:["Amerikai futball","Rugby","Labdarúgás","Kosárlabda"], correct:0},
+{q:"Melyik sportágban van a 'kick-off'?", a:["Labdarúgás","Röplabda","Rugby","Tenisz"], correct:0},
+{q:"Melyik ország rendezte a 2000-es nyári olimpiát?", a:["Ausztrália","Kína","Görögország","USA"], correct:0},
+{q:"Melyik sporthoz kapcsolódik a 'slapshot'?", a:["Jégkorong","Baseball","Kosárlabda","Labdarúgás"], correct:0},
+{q:"Ki nyerte a legtöbb Tour de France győzelmet férfiaknál?", a:["Eddy Merckx","Bernard Hinault","Miguel Indurain","Jacques Anquetil"], correct:0},
+{q:"Hány játékos van egy röplabda csapatban pályán egyszerre?", a:["6","5","7","4"], correct:0},
+{q:"Melyik sportban van a 'penalty kick'?", a:["Labdarúgás","Rugby","Kricket","Tenisz"], correct:0},
+{q:"Melyik ország rendezte a 2014-es labdarúgó világbajnokságot?", a:["Brazília","Németország","Oroszország","Dél-Afrika"], correct:0},
+{q:"Melyik sporthoz tartozik a 'slam dunk'?", a:["Kosárlabda","Röplabda","Labdarúgás","Tenisz"], correct:0},
+{q:"Melyik sportban van a 'corner kick'?", a:["Labdarúgás","Röplabda","Jégkorong","Kricket"], correct:0},
+{q:"Ki a legtöbb gólt szerző labdarúgó a világon 2025-ig?", a:["Cristiano Ronaldo","Lionel Messi","Pele","Romário"], correct:0},
+{q:"Melyik ország rendezte a 2018-as téli olimpiát?", a:["Dél-Korea","Japán","Kanada","Norvégia"], correct:0},
+{q:"Melyik sportban van a 'volley' kifejezés?", a:["Tenisz","Röplabda","Kosárlabda","Asztalitenisz"], correct:0},
+{q:"Melyik ország nyerte az 1998-as labdarúgó világbajnokságot?", a:["Franciaország","Brazília","Olaszország","Németország"], correct:0},
+{q:"Ki nyerte a legtöbb olimpiai aranyérmet úszásban?", a:["Michael Phelps","Mark Spitz","Ryan Lochte","Ian Thorpe"], correct:0},
+{q:"Melyik sportban használják a 'net' kifejezést?", a:["Tenisz","Kosárlabda","Röplabda","Labdarúgás"], correct:0},
+{q:"Hány játékos van egy jégkorong csapatban egyszerre a pályán?", a:["6","5","7","4"], correct:0},
+{q:"Melyik ország nyerte a legtöbb futball világbajnokságot?", a:["Brazília","Németország","Olaszország","Argentina"], correct:0},
+{q:"Melyik sporthoz tartozik a 'bunt' kifejezés?", a:["Baseball","Kricket","Tenisz","Kosárlabda"], correct:0},
+{q:"Melyik sportban van a 'tee-off'?", a:["Golf","Röplabda","Tenisz","Asztalitenisz"], correct:0},
+{q:"Ki a legeredményesebb Forma-1 pilóta 2025-ig?", a:["Lewis Hamilton","Michael Schumacher","Sebastian Vettel","Max Verstappen"], correct:0},
+{q:"Melyik sportban van a 'dribble' kifejezés?", a:["Kosárlabda","Labdarúgás","Röplabda","Tenisz"], correct:0},
+{q:"Melyik ország rendezte az első modern olimpiát 1896-ban?", a:["Görögország","Franciaország","Olaszország","USA"], correct:0},
+{q:"Melyik sportban van a 'hook shot'?", a:["Kosárlabda","Röplabda","Tenisz","Labdarúgás"], correct:0},
+{q:"Ki nyerte a 2022-es labdarúgó világbajnokságot?", a:["Argentína","Franciaország","Brazília","Németország"], correct:0},
+{q:"Melyik sportban használják a 'stroke' kifejezést?", a:["Úszás","Atlétika","Tenisz","Kosárlabda"], correct:0},
+{q:"Melyik sportban van a 'tee'?", a:["Golf","Röplabda","Tenisz","Asztalitenisz"], correct:0},
+{q:"Melyik ország nyerte az első labdarúgó világbajnokságot 1930-ban?", a:["Uruguay","Brazília","Olaszország","Argentina"], correct:0},
+{q:"Melyik sportban van a 'knockout'?", a:["Box","Kick-box","MMA","Összes fenti"], correct:3},
+{q:"Melyik sportban van a 'set' kifejezés?", a:["Tenisz","Röplabda","Kosárlabda","Asztalitenisz"], correct:0},
+{q:"Ki nyerte a legtöbb Formula-1 világbajnoki címet?", a:["Michael Schumacher","Lewis Hamilton","Juan Manuel Fangio","Sebastian Vettel"], correct:1},
+{q:"Melyik ország rendezte a 1992-es nyári olimpiát?", a:["Spanyolország","USA","Franciaország","Olaszország"], correct:0},
+{q:"Melyik sporthoz tartozik a 'touchline' kifejezés?", a:["Rugby","Labdarúgás","Kricket","Asztalitenisz"], correct:1},
+{q:"Melyik sportban van a 'double fault'?", a:["Tenisz","Röplabda","Kosárlabda","Labdarúgás"], correct:0},
+{q:"Ki nyerte a legtöbb Wimbledon-győzelmet férfiaknál?", a:["Roger Federer","Pete Sampras","Rafael Nadal","Novak Djokovic"], correct:0},
+{q:"Melyik ország rendezte a 2010-es labdarúgó világbajnokságot?", a:["Dél-Afrika","Brazília","Németország","Anglia"], correct:0},
+{q:"Melyik sportban van a 'line-out'?", a:["Rugby","Labdarúgás","Kosárlabda","Kricket"], correct:0},
+{q:"Melyik sportban használják a 'ace' kifejezést?", a:["Tenisz","Kosárlabda","Röplabda","Baseball"], correct:0},
+{q:"Hány játékos van egy amerikai futball csapatban egyszerre a pályán?", a:["11","10","12","9"], correct:0},
+{q:"Melyik sportban van a 'layup'?", a:["Kosárlabda","Labdarúgás","Röplabda","Tenisz"], correct:0},
+{q:"Ki nyerte a legtöbb Tour de France győzelmet 2025-ig?", a:["Eddy Merckx","Bernard Hinault","Miguel Indurain","Jacques Anquetil"], correct:0},
+{q:"Melyik sportban használják a 'backhand' kifejezést?", a:["Tenisz","Röplabda","Kosárlabda","Labdarúgás"], correct:0},
+{q:"Melyik ország nyerte a 2002-es labdarúgó világbajnokságot?", a:["Brazília","Németország","Törökország","Dél-Korea"], correct:0},
+{q:"Melyik sportban van a 'kickoff'?", a:["Labdarúgás","Rugby","Amerikai futball","Összes fenti"], correct:3},
+{q:"Melyik sporthoz tartozik a 'free throw'?", a:["Kosárlabda","Röplabda","Tenisz","Labdarúgás"], correct:0},
+{q:"Melyik ország rendezte a 1988-as nyári olimpiát?", a:["Dél-Korea","USA","Olaszország","Kanada"], correct:0},
+{q:"Ki a legtöbb olimpiai aranyérmet szerző női sportoló?", a:["Larisa Latynina","Paavo Nurmi","Michael Phelps","Simone Biles"], correct:0},
+{q:"Melyik sportban használják a 'set point' kifejezést?", a:["Tenisz","Kosárlabda","Röplabda","Asztalitenisz"], correct:0},
+{q:"Melyik ország nyerte a 2019-es női labdarúgó világbajnokságot?", a:["USA","Hollandia","Svédország","Anglia"], correct:0},
+{q:"Melyik sportban van a 'pole position'?", a:["Forma-1","MotoGP","IndyCar","Összes fenti"], correct:3},
+{q:"Melyik sportágban van a 'grand slam' kifejezés?", a:["Tenisz","Golf","Kricket","Összes fenti"], correct:3},
+{q:"Ki nyerte a legtöbb Golden Globe díjat 2025-ig?", a:["Nem sportkérdés, kihagyjuk"], correct:0},
+{q:"Melyik ország nyerte a 2021-es labdarúgó Európa-bajnokságot?", a:["Olaszország","Anglia","Spanyolország","Franciaország"], correct:0},
+{q:"Ki tartja a 100 méteres síkfutás világrekordját 2025-ig?", a:["Usain Bolt","Tyson Gay","Yohan Blake","Justin Gatlin"], correct:0},
+{q:"Melyik sporthoz tartozik a 'maul' kifejezés?", a:["Rugby","Labdarúgás","Kricket","Kosárlabda"], correct:0},
+{q:"Hány játékos van egy vízilabda csapatban egyszerre a medencében?", a:["7","6","8","9"], correct:0},
+{q:"Melyik ország rendezte a 2008-as nyári olimpiát?", a:["Kína","USA","Olaszország","Görögország"], correct:0},
+{q:"Melyik sportban van a 'lay-down' kifejezés?", a:["Tenisz","Röplabda","Nem létező kifejezés","Kosárlabda"], correct:2},
+{q:"Melyik ország nyerte a legtöbb krikett világbajnokságot?", a:["Ausztrália","India","Anglia","Pakisztán"], correct:0},
+{q:"Melyik sportágban van a 'sprint' versenyszám?", a:["Atlétika","Úszás","Kerékpár","Összes fenti"], correct:3},
+{q:"Ki nyerte a legtöbb NBA MVP díjat 2025-ig?", a:["LeBron James","Michael Jordan","Kareem Abdul-Jabbar","Bill Russell"], correct:2},
+{q:"Melyik sportban van a 'cross-country' kifejezés?", a:["Sífutás","Kerékpár","Atlétika","Összes fenti"], correct:3},
+{q:"Melyik ország nyerte a 2015-ös női labdarúgó világbajnokságot?", a:["USA","Japán","Németország","Norvégia"], correct:0},
+{q:"Melyik sportban van a 'backboard' kifejezés?", a:["Kosárlabda","Röplabda","Tenisz","Labdarúgás"], correct:0},
+{q:"Hány játékos van egy krikett csapatban?", a:["11","10","12","9"], correct:0},
+{q:"Melyik sportban használják a 'pickle' kifejezést?", a:["Nem hivatalos sportkifejezés","Kosárlabda","Tenisz","Röplabda"], correct:0},
+{q:"Melyik ország nyerte a 2010-es női labdarúgó világbajnokságot?", a:["Japán","USA","Németország","Brazília"], correct:0},
+{q:"Melyik sportban van a 'free kick'?", a:["Labdarúgás","Rugby","Amerikai futball","Kricket"], correct:0},
+{q:"Melyik ország rendezte a 1980-as nyári olimpiát?", a:["Szovjetunió","USA","Olaszország","Kanada"], correct:0},
+{q:"Ki nyerte a 2023-as férfi labdarúgó BL döntőt?", a:["Manchester City","Inter Milan","Real Madrid","Bayern München"], correct:0},
+{q:"Melyik sporthoz tartozik a 'stoppie' kifejezés?", a:["Motorsport","Kerékpár","Skateboard","Összes fenti"], correct:3},
+{q:"Hány játékos van egy rugby csapatban pályán?", a:["15","13","11","12"], correct:0},
+{q:"Melyik sportban van a 'drop shot'?", a:["Tenisz","Kosárlabda","Röplabda","Labdarúgás"], correct:0},
+{q:"Melyik ország nyerte a 2019-es férfi labdarúgó Copa América-t?", a:["Brazília","Argentina","Chile","Uruguay"], correct:0},
+{q:"Melyik sportban van a 'volley'?", a:["Röplabda","Tenisz","Kosárlabda","Labdarúgás"], correct:1},
+{q:"Melyik ország rendezte a 1994-es labdarúgó világbajnokságot?", a:["USA","Brazília","Olaszország","Svédország"], correct:0},
+{q:"Ki nyerte a legtöbb olimpiai aranyérmet női tornászok között?", a:["Larisa Latynina","Nadia Comăneci","Simone Biles","Shannon Miller"], correct:0},
+{q:"Melyik sporthoz tartozik a 'sprint relay'?", a:["Atlétika","Úszás","Kerékpár","Összes fenti"], correct:3},
+{q:"Hány játékos van egy kézilabda csapatban pályán egyszerre?", a:["7","6","8","9"], correct:0},
+{q:"Melyik ország rendezte a 1972-es nyári olimpiát?", a:["Németország","USA","Szovjetunió","Japán"], correct:0},
+{q:"Melyik sportban van a 'kick return'?", a:["Amerikai futball","Labdarúgás","Rugby","Röplabda"], correct:0},
+{q:"Ki nyerte a legtöbb Formula-1 futamot 2025-ig?", a:["Lewis Hamilton","Michael Schumacher","Sebastian Vettel","Ayrton Senna"], correct:0},
+{q:"Melyik sportban van a 'crossover' kifejezés?", a:["Kosárlabda","Röplabda","Labdarúgás","Tenisz"], correct:0},
+{q:"Melyik ország nyerte a 2011-es férfi labdarúgó világbajnokságot?", a:["Nem volt férfi VB 2011-ben","Spanyolország","Brazília","Olaszország"], correct:0},
+{q:"Melyik sportban van a 'free style' versenyszám?", a:["Úszás","Sí","Kerékpár","Összes fenti"], correct:3},
+{q:"Hány pontot ér egy touchdown az amerikai futballban?", a:["6","7","3","5"], correct:0},
+{q:"Melyik sportban van a 'grand slam' kifejezés?", a:["Tenisz","Golf","Kricket","Összes fenti"], correct:3},
+{q:"Melyik ország rendezte a 1968-as nyári olimpiát?", a:["Mexikó","USA","Szovjetunió","Japán"], correct:0},
+{q:"Ki nyerte a 2020-as Tour de France-t?", a:["Tadej Pogačar","Primož Roglič","Chris Froome","Egan Bernal"], correct:0},
+{q:"Melyik sportban van a 'set piece' kifejezés?", a:["Labdarúgás","Röplabda","Kosárlabda","Tenisz"], correct:0},
+{q:"Melyik sporthoz tartozik a 'hook' kifejezés?", a:["Box","Kick-box","MMA","Összes fenti"], correct:3},
+{q:"Melyik ország nyerte a 2017-es férfi labdarúgó Konföderációs Kupát?", a:["Németország","Chile","Portugália","Brazília"], correct:0},
+{q:"Melyik sportban van a 'puck'?", a:["Jégkorong","Rugby","Kricket","Lacrosse"], correct:0},
+{q:"Hány játékos van egy amerikai kosárlabda csapatban egyszerre?", a:["5","6","7","4"], correct:0},
+{q:"Melyik ország rendezte a 1998-as téli olimpiát?", a:["Japán","Norvégia","Kanada","USA"], correct:0},
+{q:"Melyik sportban van a 'power play'?", a:["Kricket","Jégkorong","Lacrosse","Összes fenti"], correct:3},
+{q:"Melyik ország nyerte a 2018-as női labdarúgó világbajnokságot?", a:["USA","Németország","Anglia","Franciaország"], correct:0},
+{q:"Melyik sporthoz tartozik a 'slam dunk'?", a:["Kosárlabda","Röplabda","Labdarúgás","Tenisz"], correct:0},
+{q:"Ki nyerte a legtöbb Wimbledon-győzelmet nőknél?", a:["Martina Navratilova","Serena Williams","Steffi Graf","Chris Evert"], correct:0},
+{q:"Melyik sportban van a 'kickboard'?", a:["Úszás","Surf","Röplabda","Tenisz"], correct:0},
+{q:"Hány pontot ér egy büntetőrúgás labdarúgásban?", a:["1","2","3","0"], correct:0},
+{q:"Melyik ország nyerte a 2006-os labdarúgó világbajnokságot?", a:["Olaszország","Franciaország","Brazília","Németország"], correct:0},
+{q:"Melyik sportban van a 'halfpipe' versenyszám?", a:["Snowboard","Sí","Skateboard","Összes fenti"], correct:3},
+{q:"Melyik sportban használják a 'deuce' kifejezést?", a:["Tenisz","Kosárlabda","Röplabda","Labdarúgás"], correct:0},
+{q:"Ki nyerte a 2024-es NBA bajnokságot?", a:["Denver Nuggets","Boston Celtics","Golden State Warriors","Miami Heat"], correct:0},
+{q:"Melyik sporthoz tartozik a 'birdie' kifejezés?", a:["Golf","Röplabda","Tenisz","Asztalitenisz"], correct:0},
+{q:"Melyik ország rendezte a 1956-os nyári olimpiát?", a:["Ausztrália","USA","Olaszország","Görögország"], correct:0},
+{q:"Melyik sportban van a 'service ace'?", a:["Tenisz","Kosárlabda","Röplabda","Labdarúgás"], correct:0},
+{q:"Hány játékos van egy lacrosse csapatban pályán?", a:["10","9","11","12"], correct:0},
+{q:"Melyik ország nyerte a 2013-as férfi labdarúgó Konföderációs Kupát?", a:["Brazília","Spanyolország","Olaszország","Chile"], correct:0},
+{q:"Melyik sportban van a 'line drive'?", a:["Baseball","Kricket","Labdarúgás","Röplabda"], correct:0},
+{q:"Ki nyerte a 2022-es Tour de France-t?", a:["Jonas Vingegaard","Tadej Pogačar","Primož Roglič","Richard Carapaz"], correct:0},
+{q:"Melyik sportban van a 'paddle'?", a:["Kajak-kenu","Asztalitenisz","Padel","Összes fenti"], correct:3},
+{q:"Melyik ország rendezte a 1984-es nyári olimpiát?", a:["USA","Szovjetunió","Olaszország","Kanada"], correct:0},
+{q:"Melyik sportban van a 'touchback'?", a:["Amerikai futball","Labdarúgás","Rugby","Kricket"], correct:0},
+{q:"Melyik sporthoz tartozik a 'hole-in-one'?", a:["Golf","Röplabda","Tenisz","Asztalitenisz"], correct:0},
+{q:"Ki nyerte a legtöbb Formula-1 pole pozíciót 2025-ig?", a:["Lewis Hamilton","Michael Schumacher","Ayrton Senna","Sebastian Vettel"], correct:0},
+{q:"Melyik ország nyerte a 1990-es labdarúgó világbajnokságot?", a:["Németország","Argentína","Brazília","Olaszország"], correct:0},
+{q:"Melyik sportban van a 'sand wedge'?", a:["Golf","Röplabda","Tenisz","Asztalitenisz"], correct:0},
+{q:"Hány perc egy profi kosárlabda negyed?", a:["12","10","15","8"], correct:0},
+{q:"Melyik ország rendezte a 1996-os nyári olimpiát?", a:["USA","Görögország","Ausztrália","Németország"], correct:0},
+{q:"Melyik sportban van a 'goal line'?", a:["Labdarúgás","Röplabda","Kosárlabda","Tenisz"], correct:0},
+{q:"Ki nyerte a legtöbb Grand Slam női teniszezők között 2025-ig?", a:["Serena Williams","Steffi Graf","Martina Navratilova","Chris Evert"], correct:0},
+{q:"Melyik sportban van a 'slam' kifejezés?", a:["Kosárlabda","Röplabda","Tenisz","Összes fenti"], correct:3},
+{q:"Melyik ország nyerte a 2000-es labdarúgó Európa-bajnokságot?", a:["Franciaország","Itália","Németország","Spanyolország"], correct:0},
+{q:"Melyik sportban van a 'roundhouse kick'?", a:["Kick-box","MMA","Taekwondo","Összes fenti"], correct:3},
+{q:"Melyik ország rendezte a 1976-os nyári olimpiát?", a:["Kanada","USA","Ausztrália","Németország"], correct:0},
+{q:"Melyik sportban van a 'net cord'?", a:["Tenisz","Röplabda","Kosárlabda","Labdarúgás"], correct:0},
+{q:"Hány játékos van egy férfi röplabda csapatban pályán?", a:["6","5","7","4"], correct:0},
+{q:"Melyik ország nyerte a 1982-es labdarúgó világbajnokságot?", a:["Olaszország","Németország","Franciaország","Brazília"], correct:0},
+{q:"Mikor kezdődött az I. világháború?", a:["1914","1918","1939","1905"], correct:0},
+{q:"Ki volt Magyarország első királya?", a:["Szent István","Mátyás király","IV. Béla","I. Károly"], correct:0},
+{q:"Melyik évben ért véget a II. világháború?", a:["1945","1944","1939","1950"], correct:0},
+{q:"Ki volt az amerikai függetlenségi háború fő vezére?", a:["George Washington","Abraham Lincoln","Thomas Jefferson","Benjamin Franklin"], correct:0},
+{q:"Melyik birodalom omlott össze 1917-ben?", a:["Orosz Birodalom","Oszmán Birodalom","Német Birodalom","Római Birodalom"], correct:0},
+{q:"Mikor volt a francia forradalom kezdete?", a:["1789","1776","1799","1804"], correct:0},
+{q:"Ki fedezte fel Amerikát 1492-ben?", a:["Kolumbusz Kristóf","Vasco da Gama","Marco Polo","Ferdinánd Magellán"], correct:0},
+{q:"Melyik évben esett el Konstantinápoly?", a:["1453","1492","1204","1347"], correct:0},
+{q:"Ki volt a 'Napóleon császár' valós neve?", a:["Napoléon Bonaparte","Louis XVI","Charles de Gaulle","Jean Valjean"], correct:0},
+{q:"Mikor szűnt meg az Oszmán Birodalom?", a:["1922","1918","1939","1945"], correct:0},
+{q:"Ki volt a reformáció elindítója?", a:["Márton Luther","Jean Calvin","Husz János","Ignác Loyola"], correct:0},
+{q:"Melyik évben volt az 1956-os forradalom Magyarországon?", a:["1956","1945","1968","1953"], correct:0},
+{q:"Mikor zajlott a berlini fal felépítése?", a:["1961","1945","1956","1989"], correct:0},
+{q:"Ki volt az első amerikai elnök?", a:["George Washington","Abraham Lincoln","Thomas Jefferson","John Adams"], correct:0},
+{q:"Mikor indult az ipari forradalom Angliában?", a:["XVIII. század vége","XVII. század vége","XIX. század eleje","XV. század"], correct:0},
+{q:"Melyik évben ért véget a hidegháború?", a:["1991","1989","1999","1975"], correct:0},
+{q:"Ki volt Julius Caesar gyilkosa?", a:["Marcus Junius Brutus","Cicero","Nero","Augustus"], correct:0},
+{q:"Mikor volt a nagy francia forradalom csúcspontja, a jakobinus terror?", a:["1793","1789","1799","1804"], correct:0},
+{q:"Ki volt az első női brit miniszterelnök?", a:["Margaret Thatcher","Theresa May","Elizabeth II","Angela Merkel"], correct:0},
+{q:"Melyik évben robbant ki a spanyol polgárháború?", a:["1936","1939","1945","1929"], correct:0},
+{q:"Mikor történt a mohácsi csata?", a:["1526","1514","1541","1492"], correct:0},
+{q:"Ki írta az 'Értekezés a népről' című munkát?", a:["Jean-Jacques Rousseau","Voltaire","Márton Luther","Adam Smith"], correct:0},
+{q:"Mikor zajlott a Titanic katasztrófája?", a:["1912","1905","1915","1920"], correct:0},
+{q:"Mikor vált hivatalossá az Egyesült Nemzetek Szervezete?", a:["1945","1919","1920","1939"], correct:0},
+{q:"Ki volt a Római Birodalom első császára?", a:["Augustus","Julius Caesar","Nero","Traianus"], correct:0},
+{q:"Melyik évben kezdődött a 100 éves háború?", a:["1337","1415","1299","1453"], correct:0},
+{q:"Mikor történt a csernobili atomerőmű-baleset?", a:["1986","1979","1991","1980"], correct:0},
+{q:"Ki volt a református egyház megalapítója Magyarországon?", a:["Kálvin János","Márton Luther","Huszi János","Zwingli"], correct:0},
+{q:"Mikor zajlott a Watergate-botrány?", a:["1972–1974","1968–1970","1980–1982","1962–1965"], correct:0},
+{q:"Ki volt a 'Vörös Báró' a légiháborúban?", a:["Manfred von Richthofen","Erich Hartmann","Rudolf Hess","Adolf Galland"], correct:0},
+{q:"Mikor volt az első Holdraszállás?", a:["1969","1961","1972","1959"], correct:0},
+{q:"Melyik évben alakult a NATO?", a:["1949","1919","1955","1939"], correct:0},
+{q:"Ki volt a mongol birodalom alapítója?", a:["Dzsingisz kán","Kublai kán","Attila","Timur Lenk"], correct:0},
+{q:"Mikor zajlott a berlini fal lebontása?", a:["1989","1961","1991","1985"], correct:0},
+{q:"Ki volt az első császár Kínában?", a:["Csin Si Huang-ti","Liu Bang","Kangxi","Sun Yat-sen"], correct:0},
+{q:"Mikor történt a párizsi kommün?", a:["1871","1789","1848","1918"], correct:0},
+{q:"Melyik évben volt az első olimpia az ókori Görögországban?", a:["776 BC","800 BC","700 BC","500 BC"], correct:0},
+{q:"Ki volt a magyar kiegyezés idején a miniszterelnök?", a:["Deák Ferenc","Andrássy Gyula","Tisza Kálmán","Kossuth Lajos"], correct:0},
+{q:"Mikor volt a nagy londoni tűzvész?", a:["1666","1600","1707","1688"], correct:0},
+{q:"Ki vezette a spanyol konkvisztádorokat Mexikóban?", a:["Hernán Cortés","Francisco Pizarro","Vasco Núñez de Balboa","Ferdinand Magellan"], correct:0},
+{q:"Melyik évben történt a berlini légihíd?", a:["1948","1945","1950","1961"], correct:0},
+{q:"Ki volt a 'Vörös Hadsereg' vezére a II. világháborúban?", a:["Sztálin","Trockij","Lenin","Berija"], correct:0},
+{q:"Mikor írták alá a versailles-i békeszerződést?", a:["1919","1920","1918","1923"], correct:0},
+{q:"Ki volt a reneszánsz híres festője?", a:["Leonardo da Vinci","Michelangelo","Raphael","Mind"], correct:3},
+{q:"Mikor történt a Magna Carta aláírása?", a:["1215","1066","1300","1199"], correct:0},
+{q:"Ki volt az első független Magyarország miniszterelnöke 1918 után?", a:["Károlyi Mihály","Horthy Miklós","Bethlen István","Tisza István"], correct:0},
+{q:"Melyik évben volt a Gettysburg-i csata?", a:["1863","1861","1865","1870"], correct:0},
+{q:"Ki vezette a normann hódítást Angliában 1066-ban?", a:["Hódító Vilmos","Edward","Harold Godwinson","Richard"], correct:0},
+{q:"Mikor zajlott a spanyol armada veresége Anglia ellen?", a:["1588","1600","1571","1590"], correct:0},
+{q:"Ki volt az első cár Oroszországban?", a:["I. Iván","II. Péter","III. Katalin","I. Péter"], correct:0},
+{q:"Mikor zajlott a kenyai Mau Mau felkelés?", a:["1952–1960","1945–1950","1963–1969","1939–1945"], correct:0},
+{q:"Ki volt a híres angol tengerész a 16. században, aki körbehajózta a Földet?", a:["Francis Drake","James Cook","Vasco da Gama","Ferdinand Magellan"], correct:0},
+{q:"Melyik évben történt a berlini fal felépítése?", a:["1961","1956","1970","1965"], correct:0},
+{q:"Ki volt az amerikai polgárháború észak-déli hadseregének vezetője?", a:["Ulysses S. Grant","Robert E. Lee","George Washington","Abraham Lincoln"], correct:0},
+{q:"Mikor zajlott a világtörténelem legnagyobb pestisjárványa, a fekete halál?", a:["1347–1351","1200–1250","1400–1450","1500–1550"], correct:0},
+{q:"Ki volt a II. világháború idején Németország vezetője?", a:["Adolf Hitler","Heinrich Himmler","Joseph Goebbels","Hermann Göring"], correct:0},
+{q:"Mikor zajlott a Szentföldi keresztes hadjáratok kezdete?", a:["1096","1204","1066","1187"], correct:0},
+{q:"Ki volt az első ember a Holdon?", a:["Neil Armstrong","Buzz Aldrin","Michael Collins","Yuri Gagarin"], correct:0},
+{q:"Melyik évben kezdődött az amerikai polgárháború?", a:["1861","1776","1812","1870"], correct:0},
+{q:"Ki volt az ókori Egyiptom híres királynője?", a:["Kleopátra","Nefertiti","Hatshepsut","Tutanhamon"], correct:0},
+{q:"Mikor volt a 'Rózsák háborúja' Angliában?", a:["1455–1487","1337–1453","1492–1500","1400–1420"], correct:0},
+{q:"Ki volt a szovjet vezető a II. világháború alatt?", a:["Joszif Sztálin","Lenin","Hruscsov","Trockij"], correct:0},
+{q:"Mikor zajlott a bostoni teadélután?", a:["1773","1776","1789","1800"], correct:0},
+{q:"Ki volt a híres német filozófus és történész a 19. században?", a:["Karl Marx","Friedrich Nietzsche","Hegel","Immanuel Kant"], correct:2},
+{q:"Mikor volt a nagy francia forradalom végső szakasza?", a:["1799","1789","1793","1804"], correct:0},
+{q:"Ki volt a 'Vörös Katonák' vezetője a mexikói forradalom idején?", a:["Emiliano Zapata","Pancho Villa","Porfirio Díaz","Francisco Madero"], correct:0},
+{q:"Mikor zajlott a cserkészmozgalom kezdete?", a:["1907","1899","1914","1920"], correct:0},
+{q:"Ki volt a híres spanyol festő a 20. században?", a:["Pablo Picasso","Diego Velázquez","Salvador Dalí","Francisco Goya"], correct:0},
+{q:"Mikor történt a berlini fal lebontása?", a:["1989","1961","1975","1991"], correct:0},
+{q:"Ki volt a Magna Carta aláírása idején az angol király?", a:["János király","II. Henrik","Edward I","Richárd Lelkű"], correct:0},
+{q:"Mikor zajlott az olasz egységmozgalom, a Risorgimento?", a:["XIX. század közepén","XVIII. század végén","XX. század elején","XVII. század közepén"], correct:0},
+{q:"Ki volt a híres görög filozófus, aki Athénban tanított?", a:["Szókratész","Platón","Arisztotelész","Mindhárman"], correct:3},
+{q:"Mikor volt az első szövetségi választás az USA-ban?", a:["1789","1776","1800","1812"], correct:0},
+{q:"Ki vezette az 1848-as forradalmat Magyarországon?", a:["Kossuth Lajos","Batthyány Lajos","Petőfi Sándor","Széchenyi István"], correct:0},
+{q:"Mikor volt a napóleoni háborúk vége?", a:["1815","1805","1821","1799"], correct:0},
+{q:"Ki volt az első kínai császár, aki egyesítette Kínát?", a:["Csin Si Huang-ti","Liu Bang","Kangxi","Sun Yat-sen"], correct:0},
+{q:"Mikor zajlott a francia forradalom 1792–1793 közötti radikális szakasza?", a:["Jakobinus terror","Királyi hatalom bukása","Napóleon hatalomra kerülése","Bastille ostroma"], correct:0},
+{q:"Ki volt a híres holland festő a 17. században?", a:["Rembrandt","Vermeer","Van Gogh","Mondrian"], correct:1},
+{q:"Mikor volt a 'Római Birodalom bukása'?", a:["476","410","500","395"], correct:0},
+{q:"Ki volt az első amerikai női elnökjelölt?", a:["Victoria Woodhull","Hillary Clinton","Kamala Harris","Susan B. Anthony"], correct:0},
+{q:"Mikor zajlott a híres Szuezi válság?", a:["1956","1948","1967","1950"], correct:0},
+{q:"Ki volt a 'Vörös Báró' a légiháborúban?", a:["Manfred von Richthofen","Erich Hartmann","Rudolf Hess","Adolf Galland"], correct:0},
+{q:"Mikor történt a nagy londoni tűzvész?", a:["1666","1600","1707","1688"], correct:0},
+{q:"Ki fedezte fel Amerikát 1492-ben?", a:["Kolumbusz Kristóf","Vasco da Gama","Marco Polo","Ferdinánd Magellán"], correct:0},
+{q:"Mikor zajlott a Watergate-botrány?", a:["1972–1974","1968–1970","1980–1982","1962–1965"], correct:0}
+
+];
+
+/* ================================
+   ÁLLAPOT
+   ================================ */
+let players = [
+  {id:1, name:"Te", points:100, active:true, answer:null},
+  {id:2, name:"P2", points:100, active:true, answer:null},
+  {id:3, name:"P3", points:100, active:true, answer:null},
+  {id:4, name:"P4", points:100, active:true, answer:null},
+  {id:5, name:"P5", points:100, active:true, answer:null},
+  {id:6, name:"P6", points:100, active:true, answer:null},
+  {id:7, name:"P7", points:100, active:true, answer:null},
+];
+
+let currentQ = 0;
+let stake = 10;
+let pot = 0;
+let timer = 15;          // 15 mp / kör
+let tInterval = null;
+let stakeInterval = null;
+let answering = true;    // saját válaszgombok engedélyezése
+
+/* ================================
+   SEGÉDEK DOM-hoz
+   ================================ */
+const $table   = document.getElementById('table');
+const $answers = document.getElementById('answers');
+const $question= document.getElementById('question');
+const $timer   = document.getElementById('timer');
+const $stake   = document.getElementById('stake');
+const $pot     = document.getElementById('pot');
+const $rank    = document.getElementById('rank');
+const $roundMsg= document.getElementById('roundMsg');
+const $potCenter = document.getElementById('potCenter');
+
+function fmt(n){ return Math.round(n); }
+
+/* ================================
+   JÁTÉKOSOK ELHELYEZÉSE OVÁLISON
+   ================================ */
+function renderPlayers(){
+  // töröljük az előző player bubikat
+  [...$table.querySelectorAll('.player')].forEach(n=>n.remove());
+
+  const W = $table.clientWidth, H = $table.clientHeight;
+  const cx = W/2, cy = H/2;
+  const rx = W/2 - 70;      // ovális vízszintes sugár (padding figyelembe véve)
+  const ry = H/2 - 40;      // ovális függőleges sugár
+
+  const N = players.length;
+  for(let i=0;i<N;i++){
+    const p = players[i];
+    const angle = (2*Math.PI*i/N) - Math.PI/2; // felülről indulunk
+    const x = cx + rx*Math.cos(angle);
+    const y = cy + ry*Math.sin(angle);
+
+    const div = document.createElement('div');
+    div.className = 'player' + (p.active?'':' out') + (p.id===1?' me':'');
+    div.style.left = (x-36)+'px';
+    div.style.top  = (y-36)+'px';
+    div.dataset.pid = p.id;
+    div.innerHTML = `<div class="name">${p.name}</div><div class="pts">${fmt(p.points)}</div>`;
+    $table.appendChild(div);
+  }
+}
+
+/* ================================
+   KÉRDÉS BETÖLTÉSE
+   ================================ */
+function loadQuestion(){
+  // játék vége, ha max 1 aktív
+  if(players.filter(p=>p.active).length<=1){
+    $question.textContent = "Játék vége!";
+    $answers.innerHTML = '';
+    $roundMsg.textContent = '';
+    stopRoundTimer();
+    return;
+  }
+  if(currentQ>=questions.length) currentQ=0;
+
+  const q = questions[currentQ];
+  $question.textContent = q.q;
+
+  // saját válaszgombok (csak itt láthatók)
+  $answers.innerHTML = '';
+  q.a.forEach((label, idx)=>{
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn';
+    btn.textContent = label;
+    btn.onclick = ()=> submitAnswer(idx);
+    $answers.appendChild(btn);
+  });
+  setButtonsEnabled(true);
+  answering = true;
+
+  // reset válaszok
+  players.forEach(p=>p.answer=null);
+
+  // köridőzítő 15s
+  timer = 15;
+  $timer.textContent = timer;
+  stopRoundTimer();
+  tInterval = setInterval(()=>{
+    timer--;
+    $timer.textContent = timer;
+    if(timer<=0){
+      submitAnswer(null); // nem válaszoltál
+    }
+  },1000);
+
+  $roundMsg.textContent = '';
+  renderPlayers();
+  updateInfo();
+}
+
+/* ================================
+   VÁLASZ BEKÜLDÉSE + KÖR LEFUT
+   ================================ */
+async function submitAnswer(myAnswerIndex){
+  if(!answering) return;
+  answering = false;
+  setButtonsEnabled(false);
+  stopRoundTimer();
+
+  const q = questions[currentQ];
+
+  // Te válaszod
+  const me = players.find(p=>p.id===1);
+  me.answer = myAnswerIndex;
+
+  // Botok válaszolnak
+  players.forEach(p=>{
+    if(p.active && p.id!==1){
+      // Lehet picit „okosabb” is: 55% eséllyel helyes
+      const smart = Math.random()<0.55;
+      p.answer = smart ? q.correct : Math.floor(Math.random()*q.a.length);
+    }
+  });
+
+  // BEFIZETÉS: minden aktív játékos fizeti a tétet a potba
+  const payMap = new Map(); // pid -> fizetett összeg
+  players.forEach(p=>{
+    if(p.active){
+      const pay = Math.min(p.points, stake);
+      p.points -= pay;
+      if(p.points<=0){ p.points=0; p.active=false; }
+      if(pay>0){ payMap.set(p.id, pay); }
+    }
+  });
+
+  // zsetonok vizuálisan a középre
+  await animateChipsToCenter(payMap);
+
+  // pot növelése (csak most írjuk jóvá, hogy az animáció idején ne „ugorjon”)
+  let added = 0;
+  payMap.forEach(v=>added+=v);
+  pot += added;
+  updateInfo();
+
+  // Helyes válaszadók
+  const winners = players.filter(p=>p.active && p.answer===q.correct);
+  const hadWinners = winners.length>0;
+
+  // Ha vannak nyertesek, osszuk el (egyenlően, maradék a potban marad)
+  let share = 0;
+  if(hadWinners){
+    share = Math.floor(pot / winners.length);
+  }
+
+  // animáció: középről a nyertesekhez (ha van nyertes)
+  if(hadWinners){
+    await animateChipsFromCenterToWinners(winners, share);
+    // jóváírás pontokban
+    winners.forEach(p=> p.points += share);
+    // pot maradéka (ha volt kerekítési maradék) marad a középen
+    pot = pot - share * winners.length;
+    updateInfo();
+
+    // villogjanak a nyertesek
+    flashWinners(winners);
+    $roundMsg.textContent = "Helyes válasz! Nyeremény kiosztva.";
+  } else {
+    $roundMsg.textContent = "Senki sem találta el, a pot bent marad.";
+  }
+
+  // következő kérdés
+  currentQ++;
+  setTimeout(loadQuestion, 1400);
+}
+
+/* ================================
+   GOMBOK ENGEDÉLYEZÉSE
+   ================================ */
+function setButtonsEnabled(on){
+  [...$answers.querySelectorAll('button')].forEach(b=>b.disabled=!on);
+}
+
+/* ================================
+   TIMER SEGÉD
+   ================================ */
+function stopRoundTimer(){
+  if(tInterval){ clearInterval(tInterval); tInterval=null; }
+}
+
+/* ================================
+   UI FRISSÍTÉS
+   ================================ */
+function updateInfo(){
+  $stake.textContent = stake;
+  $pot.textContent = fmt(pot);
+
+  // Rang: aktívak pont szerint
+  const actives = players.filter(p=>p.active).sort((a,b)=>b.points-a.points);
+  const meIdx = actives.findIndex(p=>p.id===1);
+  $rank.textContent = (meIdx>=0 ? (meIdx+1) : "-") + " / " + actives.length;
+
+  // játékos bubik pont frissítés
+  $table.querySelectorAll('.player').forEach(div=>{
+    const pid = +div.dataset.pid;
+    const p = players.find(x=>x.id===pid);
+    div.classList.toggle('out', !p.active);
+    div.querySelector('.pts').textContent = fmt(p.points);
+  });
+}
+
+/* ================================
+   ZSETON ANIMÁCIÓK
+   ================================ */
+function getPlayerCenter(pid){
+  const el = [...$table.querySelectorAll('.player')].find(d=>+d.dataset.pid===pid);
+  const rect = el.getBoundingClientRect();
+  const tRect = $table.getBoundingClientRect();
+  return { x: rect.left - tRect.left + rect.width/2, y: rect.top - tRect.top + rect.height/2 };
+}
+function getPotCenter(){
+  const rect = $potCenter.getBoundingClientRect();
+  const tRect = $table.getBoundingClientRect();
+  return { x: rect.left - tRect.left + rect.width/2, y: rect.top - tRect.top + rect.height/2 };
+}
+
+function makeChip(x,y,label){
+  const c = document.createElement('div');
+  c.className='chip';
+  c.style.left = x+'px';
+  c.style.top  = y+'px';
+  c.textContent = label;
+  $table.appendChild(c);
+  return c;
+}
+
+// Minden befizető játékostól 1 zseton (a tét összegével) bemegy középre
+function animateChipsToCenter(payMap){
+  return new Promise(resolve=>{
+    const center = getPotCenter();
+    const chips = [];
+    payMap.forEach((amount, pid)=>{
+      const from = getPlayerCenter(pid);
+      const chip = makeChip(from.x, from.y, amount);
+      requestAnimationFrame(()=>{
+        chip.style.left = center.x+'px';
+        chip.style.top  = center.y+'px';
+      });
+      chips.push(chip);
+    });
+    // várjunk, amíg megérkeznek
+    setTimeout(()=>{ chips.forEach(ch=>ch.remove()); resolve(); }, 700);
+  });
+}
+
+// Középről szétosztjuk a nyertesekhez (vizuális zsetonok, share felirattal)
+function animateChipsFromCenterToWinners(winners, share){
+  return new Promise(resolve=>{
+    if(share<=0 || winners.length===0){ resolve(); return; }
+    const center = getPotCenter();
+
+    // Hogy ne tegyünk túl sok elemet, játékosonként 1 „nyeremény” zseton megy
+    const chips = winners.map(w=>{
+      const chip = makeChip(center.x, center.y, share);
+      return {chip, pid:w.id};
+    });
+
+    requestAnimationFrame(()=>{
+      chips.forEach(({chip,pid})=>{
+        const to = getPlayerCenter(pid);
+        chip.style.left = to.x+'px';
+        chip.style.top  = to.y+'px';
+      });
+    });
+
+    setTimeout(()=>{ chips.forEach(({chip})=>chip.remove()); resolve(); }, 750);
+  });
+}
+
+/* ================================
+   VILLOGTATÁS GYŐZTESEKEN
+   ================================ */
+function flashWinners(winners){
+  winners.forEach(w=>{
+    const el = [...$table.querySelectorAll('.player')].find(d=>+d.dataset.pid===w.id);
+    if(el){
+      el.classList.add('flash');
+      setTimeout(()=>el.classList.remove('flash'), 1800);
+    }
+  });
+}
+
+/* ================================
+   TÉT DUPLÁZÓDÁS 5 PERCENKÉNT
+   ================================ */
+function startStakeDoubler(){
+  if(stakeInterval) clearInterval(stakeInterval);
+  stakeInterval = setInterval(()=>{
+    stake *= 2;
+    updateInfo();
+  }, 5*60*1000);
+}
+
+/* ================================
+   INDÍTÁS
+   ================================ */
+function start(){
+  renderPlayers();
+  startStakeDoubler();
+  loadQuestion();
+}
+start();
+</script>
+</body>
+</html>
