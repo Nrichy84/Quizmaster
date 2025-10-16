@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quizmaster – Regisztráció</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Poppins:wght@400;600&display=swap');
+
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #0a0a0a, #1c0000, #660000);
+      background-size: 400% 400%;
+      animation: gradientShift 10s ease infinite;
+      color: white;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .container {
+      background: rgba(0, 0, 0, 0.7);
+      padding: 40px;
+      border-radius: 15px;
+      box-shadow: 0 0 25px #ff0000;
+      text-align: center;
+      width: 90%;
+      max-width: 400px;
+    }
+
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      color: #ff0000;
+      margin-bottom: 20px;
+      text-shadow: 0 0 20px #ff0000;
+    }
+
+    input {
+      width: 85%;
+      padding: 12px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 6px;
+      background: #1a1a1a;
+      color: white;
+      font-size: 1em;
+      outline: none;
+      transition: all 0.3s;
+    }
+
+    input:focus {
+      border: 2px solid #ff0000;
+      box-shadow: 0 0 10px #ff0000;
+    }
+
+    button {
+      width: 90%;
+      background: #ff0000;
+      border: none;
+      padding: 12px;
+      color: white;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 1.1em;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 10px;
+      box-shadow: 0 0 15px #ff0000;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      background: #ff3333;
+      box-shadow: 0 0 25px #ff3333;
+    }
+
+    a {
+      display: block;
+      color: #ff6666;
+      text-decoration: none;
+      margin-top: 15px;
+      font-size: 0.9em;
+      transition: color 0.3s;
+    }
+
+    a:hover {
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Regisztráció</h1>
+    <form>
+      <input type="text" placeholder="Felhasználónév" required>
+      <input type="email" placeholder="E-mail cím" required>
+      <input type="password" placeholder="Jelszó" required>
+      <input type="password" placeholder="Jelszó megerősítése" required>
+      <button type="submit">Regisztrálok</button>
+    </form>
+    <a href="index.html">⬅️ Vissza a főoldalra</a>
+  </div>
+</body>
+</html>
