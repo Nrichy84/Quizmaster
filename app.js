@@ -7,8 +7,8 @@ import expressLayouts from 'express-ejs-layouts';
 import { fileURLToPath } from 'url';
 
 import authRoutes from './src/routes/auth.js';
-import tournamentRoutes from './routes/tournaments.js';
-import playRoutes from './routes/play.js';
+import tournamentRoutes from './src/routes/tournaments.js';
+import playRoutes from './src/routes/play.js';
 import adminRoutes from './routes/admin.js';   // ✅ új admin útvonal
 import db from './db.js';
 
