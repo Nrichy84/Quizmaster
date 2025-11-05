@@ -60,7 +60,7 @@ app.use(authRoutes);
 app.use(tournamentRoutes);
 app.use(playRoutes);
 app.use(adminRoutes);   // ✅ hozzáadva az admin route
-import lobbyRoutes from './routes/lobby.js';
+import lobbyRoutes from './src/routes/lobby.js';
 app.use(lobbyRoutes);
 
 app.use(express.json());
