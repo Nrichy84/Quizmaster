@@ -10,7 +10,7 @@ import authRoutes from './src/routes/auth.js';
 import tournamentRoutes from './src/routes/tournaments.js';
 import playRoutes from './src/routes/play.js';
 import adminRoutes from './src/routes/admin.js';   // ✅ új admin útvonal
-import db from './db.js';
+import db from './src/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
