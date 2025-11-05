@@ -1,0 +1,1 @@
+Ide másold a háttérképet 'bg.jpg' néven.

@@ -1,0 +1,116 @@
+<style>
+  :root{ --table-green-1:#0e5f35; --table-green-2:#094525; --chip:#f1c40f; --chip-text:#1b1b1b; --player:#218c3c; --player-out:#666; --me-ring:gold; }
+  #table{ width:min(92vw,1000px); height:min(60vw,520px); margin:18px auto; position:relative; overflow:hidden;
+    background: radial-gradient(circle at 50% 45%, var(--table-green-1), var(--table-green-2) 70%), url('/img/bg.jpg') center/cover no-repeat;
+    border-radius:50% / 35%; box-shadow: 0 25px 60px rgba(0,0,0,.55), inset 0 0 80px rgba(0,0,0,.6); border:8px solid #3a2317; }
+  #centerUI{ position:absolute; inset:20% 18% 18% 18%; display:flex; flex-direction:column; justify-content:space-between; align-items:center; text-align:center; }
+  #question{font-size:1.2rem; margin:0 0 .6rem;}
+  #answers{display:grid; grid-template-columns:1fr 1fr; gap:.5rem; width:min(520px,100%);}
+  .answer-btn{ padding:.6rem .9rem; border:none; border-radius:10px; background:#2d7bd1; color:#fff; font-size:1rem; cursor:pointer; }
+  .answer-btn:hover{background:#1abc9c;} .answer-btn:disabled{opacity:.6; cursor:not-allowed}
+  #infoBar{ display:grid; grid-template-columns:repeat(4,auto); gap:1rem; align-items:center; justify-content:center; margin-top:.6rem; font-weight:bold; }
+  #infoBar .pill{ background:rgba(0,0,0,.25); padding:.35rem .6rem; border-radius:999px; }
+  .player{ width:72px; height:72px; position:absolute; border-radius:50%; background:var(--player); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:6px; box-sizing:border-box; font-size:.8rem; line-height:1.1; user-select:none; box-shadow:0 3px 10px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.08); }
+  .player.me{outline:3px solid var(--me-ring);} .player.out{background:var(--player-out); opacity:.55; filter:grayscale(.3)}
+  .chip{ position:absolute; width:28px; height:28px; border-radius:50%; background:radial-gradient(circle at 35% 35%, #ffe27a, var(--chip)); box-shadow:0 3px 8px rgba(0,0,0,.45), inset 0 0 0 3px rgba(0,0,0,.15);
+    display:flex; align-items:center; justify-content:center; color:var(--chip-text); font-weight:bold; font-size:.72rem; transform:translate(-50%,-50%); transition:left .6s ease, top .6s ease; pointer-events:none; z-index:20; }
+  #potCenter{ position:absolute; left:50%; top:48%; transform:translate(-50%,-50%); width:120px; height:120px; border-radius:50%; border:2px dashed rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; color:#f9d17a; font-weight:bold; }
+  #roundMsg{ position:absolute; bottom:8px; left:50%; transform:translateX(-50%); font-style:italic; opacity:.9; font-size:.95rem; }
+</style>
+
+<div id="table">
+  <div id="potCenter">POT</div>
+  <div id="centerUI">
+    <div>
+      <div id="question">Betöltés…</div>
+      <div id="answers"></div>
+    </div>
+    <div id="infoBar">
+      <div class="pill">⏱️ Idő: <span id="timer">15</span>s</div>
+      <div class="pill">🎲 Tét: <span id="stake">10</span></div>
+      <div class="pill">💰 Pot: <span id="pot">0</span></div>
+      <div class="pill">📊 Helyezésed: <span id="rank">-</span></div>
+    </div>
+  </div>
+  <div id="roundMsg"></div>
+</div>
+
+<script>
+const TID = <%- JSON.stringify(t.id) %>;
+let questions = [];
+fetch('/api/questions').then(r=>r.json()).then(data => { questions = data; start(); });
+
+let players = [
+  {id:1, username:<%- JSON.stringify(user.username) %>, name:"Te", points:100, active:true, answer:null},
+  {id:2, name:"P2", points:100, active:true, answer:null},
+  {id:3, name:"P3", points:100, active:true, answer:null},
+  {id:4, name:"P4", points:100, active:true, answer:null},
+  {id:5, name:"P5", points:100, active:true, answer:null},
+  {id:6, name:"P6", points:100, active:true, answer:null},
+  {id:7, name:"P7", points:100, active:true, answer:null},
+];
+
+let currentQ = 0, stake = 10, pot = 0, timer = 15, tInterval = null, stakeInterval = null, answering = true;
+
+const $table=document.getElementById('table'), $answers=document.getElementById('answers'), $question=document.getElementById('question'),
+$timer=document.getElementById('timer'), $stake=document.getElementById('stake'), $pot=document.getElementById('pot'),
+$rank=document.getElementById('rank'), $roundMsg=document.getElementById('roundMsg'), $potCenter=document.getElementById('potCenter');
+
+function fmt(n){ return Math.round(n); }
+function renderPlayers(){
+  [...$table.querySelectorAll('.player')].forEach(n=>n.remove());
+  const W=$table.clientWidth,H=$table.clientHeight,cx=W/2,cy=H/2,rx=W/2-70,ry=H/2-40,N=players.length;
+  for(let i=0;i<N;i++){ const p=players[i],a=(2*Math.PI*i/N)-Math.PI/2,x=cx+rx*Math.cos(a),y=cy+ry*Math.sin(a);
+    const d=document.createElement('div'); d.className='player'+(p.active?'':' out')+(p.id===1?' me':''); d.style.left=(x-36)+'px'; d.style.top=(y-36)+'px'; d.dataset.pid=p.id;
+    d.innerHTML=`<div class="name">${p.name}</div><div class="pts">${fmt(p.points)}</div>`; $table.appendChild(d); }
+}
+function loadQuestion(){
+  if(players.filter(p=>p.active).length<=1){ endGame(); return; }
+  if(currentQ>=questions.length) currentQ=0;
+  const q=questions[currentQ]; $question.textContent=q.q; $answers.innerHTML='';
+  q.a.forEach((label,idx)=>{ const b=document.createElement('button'); b.className='answer-btn'; b.textContent=label; b.onclick=()=>submitAnswer(idx); $answers.appendChild(b); });
+  setButtonsEnabled(true); answering=true; players.forEach(p=>p.answer=null);
+  timer=15; $timer.textContent=timer; stopRoundTimer();
+  tInterval=setInterval(()=>{ timer--; $timer.textContent=timer; if(timer<=0){ submitAnswer(null);} },1000);
+  $roundMsg.textContent=''; renderPlayers(); updateInfo();
+}
+async function submitAnswer(myIdx){
+  if(!answering) return; answering=false; setButtonsEnabled(false); stopRoundTimer();
+  const q=questions[currentQ]; const me=players.find(p=>p.id===1); me.answer=myIdx;
+  players.forEach(p=>{ if(p.active && p.id!==1){ const smart=Math.random()<0.55; p.answer= smart ? q.correct : Math.floor(Math.random()*q.a.length);} });
+  const payMap=new Map(); players.forEach(p=>{ if(p.active){ const pay=Math.min(p.points, stake); p.points-=pay; if(p.points<=0){p.points=0;p.active=false;} if(pay>0) payMap.set(p.id,pay); } });
+  await animateChipsToCenter(payMap); let added=0; payMap.forEach(v=>added+=v); pot+=added; updateInfo();
+  const winners=players.filter(p=>p.active && p.answer===q.correct); const had=winners.length>0; let share=0; if(had){ share=Math.floor(pot/winners.length); }
+  if(had){ await animateChipsFromCenterToWinners(winners,share); winners.forEach(p=>p.points+=share); pot=pot-share*winners.length; updateInfo(); flashWinners(winners); $roundMsg.textContent="Helyes válasz!"; }
+  else { $roundMsg.textContent="Senki sem találta el, a pot bent marad."; }
+  currentQ++; setTimeout(loadQuestion, 1200);
+}
+function setButtonsEnabled(on){ [...$answers.querySelectorAll('button')].forEach(b=>b.disabled=!on); }
+function stopRoundTimer(){ if(tInterval){ clearInterval(tInterval); tInterval=null; } }
+function updateInfo(){ $stake.textContent=stake; $pot.textContent=fmt(pot);
+  const act=players.filter(p=>p.active).sort((a,b)=>b.points-a.points); const meIdx=act.findIndex(p=>p.id===1);
+  $rank.textContent=(meIdx>=0?(meIdx+1):"-")+" / "+act.length;
+  $table.querySelectorAll('.player').forEach(div=>{ const pid=+div.dataset.pid; const p=players.find(x=>x.id===pid); div.classList.toggle('out',!p.active); div.querySelector('.pts').textContent=fmt(p.points); });
+}
+function getPlayerCenter(pid){ const el=[...$table.querySelectorAll('.player')].find(d=>+d.dataset.pid===pid); const r=el.getBoundingClientRect(), t=$table.getBoundingClientRect(); return {x:r.left - t.left + r.width/2, y:r.top - t.top + r.height/2}; }
+function getPotCenter(){ const r=$potCenter.getBoundingClientRect(), t=$table.getBoundingClientRect(); return {x:r.left - t.left + r.width/2, y:r.top - t.top + r.height/2}; }
+function makeChip(x,y,label){ const c=document.createElement('div'); c.className='chip'; c.style.left=x+'px'; c.style.top=y+'px'; c.textContent=label; $table.appendChild(c); return c; }
+function animateChipsToCenter(payMap){ return new Promise(res=>{ const center=getPotCenter(); const chips=[]; payMap.forEach((amount,pid)=>{ const from=getPlayerCenter(pid); const chip=makeChip(from.x,from.y,amount); requestAnimationFrame(()=>{ chip.style.left=center.x+'px'; chip.style.top=center.y+'px'; }); chips.push(chip); });
+  setTimeout(()=>{ chips.forEach(ch=>ch.remove()); res(); },700); }); }
+function animateChipsFromCenterToWinners(winners,share){ return new Promise(res=>{ if(share<=0 || winners.length===0){ res(); return; } const center=getPotCenter(); const chips=winners.map(w=>{ const chip=makeChip(center.x,center.y,share); return {chip,pid:w.id}; });
+  requestAnimationFrame(()=>{ chips.forEach(({chip,pid})=>{ const to=getPlayerCenter(pid); chip.style.left=to.x+'px'; chip.style.top=to.y+'px'; }); }); setTimeout(()=>{ chips.forEach(({chip})=>chip.remove()); res(); },750); }); }
+function flashWinners(winners){ winners.forEach(w=>{ const el=[...$table.querySelectorAll('.player')].find(d=>+d.dataset.pid===w.id); if(el){ el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1800);} }); }
+function startStakeDoubler(){ if(stakeInterval) clearInterval(stakeInterval); stakeInterval=setInterval(()=>{ stake*=2; updateInfo(); },5*60*1000); }
+
+function endGame(){
+  $question.textContent="Játék vége! Eredmények küldése…"; $answers.innerHTML=''; $roundMsg.textContent=''; stopRoundTimer(); if(stakeInterval) clearInterval(stakeInterval);
+  const ranked=[...players].sort((a,b)=>b.points-a.points).map((p,i)=>({ username: p.username || p.name, rank: i+1 }));
+  fetch(`/api/tournaments/${TID}/finish`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ standings: ranked }) })
+  .then(r=>r.json()).then(data=>{
+    if(data.ok){ const me=data.payouts.find(x=>x.username===<%- JSON.stringify(user.username) %>);
+      $roundMsg.textContent = me ? `Lezárva. Nyereményed: ${me.prize} Ft` : 'Lezárva.'; setTimeout(()=>{ window.location.href='/dashboard'; }, 2500); }
+    else { $roundMsg.textContent='Lezárás hiba: '+(data.error||''); }
+  }).catch(()=>{ $roundMsg.textContent='Hálózati hiba a lezáráskor.'; });
+}
+function start(){ renderPlayers(); startStakeDoubler(); loadQuestion(); }
+</script>

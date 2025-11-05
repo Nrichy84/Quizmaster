@@ -1,0 +1,118 @@
+<section class="tournaments">
+  <h1>
+    <% if (type === 'free') { %>
+      Játékpénzes versenyek
+    <% } else if (type === 'freeroll') { %>
+      Freeroll versenyek
+    <% } else if (type === 'buyin') { %>
+      Buy-in versenyek
+    <% } else { %>
+      Versenyek
+    <% } %>
+  </h1>
+
+  <% if (tournaments.length === 0) { %>
+    <p>Nincs elérhető verseny ebben a kategóriában.</p>
+  <% } else { %>
+    <div class="tournament-box">
+      <table>
+        <thead>
+          <tr>
+            <th>Név</th>
+            <th>Típus</th>
+            <th>Kezdés</th>
+            <th>Buy-in</th>
+            <th>Prize pool</th>
+            <th>Művelet</th>
+          </tr>
+        </thead>
+        <tbody>
+ <% tournaments.forEach(t => { %>
+  <% const alreadyJoined = joinedIds.includes(t.id); %>
+  <tr>
+    <td><%= t.name %></td>
+    <td><%= t.type %></td>
+    <td><%= t.start_time %></td>
+    <td><%= t.entry_fee %></td>
+    <td><%= t.prize_pool %></td>
+    <td>
+      <button
+  class="btn join-btn <%= alreadyJoined || t.isExpired ? 'joined' : '' %>"
+  data-id="<%= t.id %>"
+  <%= alreadyJoined || t.isExpired ? 'disabled' : '' %>>
+  <%= t.isExpired ? 'Lekésted' : (alreadyJoined ? 'Csatlakozva' : 'Csatlakozás') %>
+</button>
+
+      <a href="/lobby/<%= t.id %>" class="btn lobby-btn <%= alreadyJoined ? '' : 'hidden' %>">Lobby megnyitása</a>
+    </td>
+  </tr>
+<% }) %>
+
+</tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.join-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+
+      fetch(`/tournaments/${id}/join`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.ok) {
+            btn.textContent = 'Csatlakozva';
+            btn.classList.add('joined');
+            btn.disabled = true;
+
+            // 💰 Egyenleg frissítése az oldalon
+  if (data.newBalance !== undefined) {
+    const balanceEl = document.querySelector('#user-balance');
+    if (balanceEl) balanceEl.textContent = data.newBalance;
+  }
+
+            // Mutatjuk a lobby gombot
+            const lobbyBtn = btn.parentElement.querySelector('.lobby-btn');
+            if (lobbyBtn) lobbyBtn.classList.remove('hidden');
+          } else if (data.alreadyJoined) {
+            btn.textContent = 'Már csatlakoztál';
+            btn.disabled = true;
+          } else {
+            alert(data.error || 'Hiba történt a csatlakozás során.');
+          }
+        })
+        .catch(() => alert('Nem sikerült csatlakozni a szerverhez.'));
+    });
+  });
+});
+</script>
+
+<script>
+// ✅ Élő frissítés: minden másodpercben ellenőrzi a versenyeket
+function checkExpiredTournaments() {
+  document.querySelectorAll('tr').forEach(row => {
+    const dateCell = row.querySelector('td:nth-child(3)'); // 3. oszlop: Kezdés
+    const button = row.querySelector('.join-btn');
+    if (!dateCell || !button) return;
+
+    const startTimeStr = dateCell.textContent.trim().replace(' ', 'T');
+    const startTime = new Date(startTimeStr);
+    const now = new Date();
+
+    if (now >= startTime && !button.disabled) {
+      button.disabled = true;
+      button.textContent = 'Lekésted';
+      button.classList.add('joined');
+      console.log(`⏰ ${startTimeStr} verseny elindult → gomb tiltva`);
+    }
+  });
+}
+
+// ✅ Indítás, amint az oldal betöltődött
+document.addEventListener('DOMContentLoaded', () => {
+  setInterval(checkExpiredTournaments, 1000); // másodpercenként
+});
+</script>

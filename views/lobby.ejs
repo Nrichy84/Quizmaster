@@ -1,0 +1,51 @@
+<section class="lobby">
+  <h1><%= tournament.name %> - Lobby</h1>
+  <p>Kezdés ideje: <%= new Date(tournament.start_time).toLocaleString() %></p>
+  <p>Nevezési díj: <%= tournament.entry_fee %> <%= tournament.type === 'free' ? 'zseton' : 'Ft' %></p>
+
+  <h3>Játékosok:</h3>
+  <ul>
+    <% players.forEach(p => { %>
+      <li><%= p.username %></li>
+    <% }) %>
+  </ul>
+
+  <div id="countdown" style="font-size: 2rem; margin-top: 20px; text-align: center; font-weight: bold;">
+    Számolás indul...
+  </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const startTime = new Date('<%= tournament.start_time %>').getTime();
+  const countdownEl = document.getElementById('countdown');
+
+  const timer = setInterval(() => {
+  const now = new Date().getTime();
+  const distance = startTime - now;
+
+  if (distance <= 0) {
+    clearInterval(timer);
+    countdownEl.textContent = "A verseny elkezdődött!";
+    countdownEl.style.color = '#00ff88';
+    setTimeout(() => {
+      window.location.href = '/game/<%= tournament.id %>';
+    }, 2000);
+    return;
+  }
+
+  const hours = Math.floor((distance / (1000 * 60 * 60)) % 24);
+  const minutes = Math.floor((distance / (1000 * 60)) % 60);
+  const seconds = Math.floor((distance / 1000) % 60);
+
+  countdownEl.textContent = `${hours.toString().padStart(2, '0')}:${minutes
+    .toString()
+    .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+  // 10 másodperc alatt villogjon pirosan
+  if (distance < 10000) {
+    countdownEl.classList.add('warning');
+  }
+}, 1000);
+});
+</script>

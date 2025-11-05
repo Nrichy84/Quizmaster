@@ -1,0 +1,32 @@
+[
+  {
+    "q": "Mi Magyarország fővárosa?",
+    "a": [
+      "Debrecen",
+      "Budapest",
+      "Szeged",
+      "Pécs"
+    ],
+    "correct": 1
+  },
+  {
+    "q": "Melyik bolygót hívják Vörös bolygónak?",
+    "a": [
+      "Vénusz",
+      "Jupiter",
+      "Mars",
+      "Szaturnusz"
+    ],
+    "correct": 2
+  },
+  {
+    "q": "Hány perc egy futballmérkőzés rendes játékideje?",
+    "a": [
+      "60",
+      "90",
+      "80",
+      "120"
+    ],
+    "correct": 1
+  }
+]

@@ -1,0 +1,110 @@
+<main class="admin-container">
+  <h1>Versenyek kezelése</h1>
+
+  <section class="create-section">
+    <h2>Új verseny létrehozása</h2>
+<form method="post" action="/admin/tournaments">
+  <label>Verseny neve:</label>
+  <input type="text" name="name" required>
+
+  <label>Típus:</label>
+  <select name="type" required>
+    <option value="Play Money">Play Money</option>
+    <option value="Freeroll">Freeroll</option>
+    <option value="Buy-in">Buy-in</option>
+  </select>
+
+  <label>Nevezési díj:</label>
+  <input type="number" name="entry_fee" value="0" min="0">
+
+  <label>Kezdés időpontja:</label>
+  <input type="datetime-local" name="start_time" required>
+
+  <button type="submit">Létrehozás</button>
+</form>
+  </section>
+
+  <section class="tournament-section">
+    <h2>Play Money versenyek</h2>
+    <table class="tournament-table">
+      <tr>
+        <th>ID</th>
+        <th>Név</th>
+        <th>Nevezési díj</th>
+        <th>Kezdés</th>
+        <th>Játékosok</th>
+        <th>Művelet</th>
+      </tr>
+      <% playmoney.forEach(t => { %>
+        <tr>
+          <td><%= t.id %></td>
+          <td><%= t.name %></td>
+          <td><%= t.entry_fee %> Zseton</td>
+          <td><%= t.start_time %></td>
+          <td><%= t.player_count %></td>
+          <td>
+            <form method="post" action="/admin/tournaments/<%= t.id %>/delete">
+              <button type="submit" class="delete-btn">Törlés</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </table>
+  </section>
+
+  <section class="tournament-section">
+    <h2>Freeroll versenyek</h2>
+    <table class="tournament-table">
+      <tr>
+        <th>ID</th>
+        <th>Név</th>
+        <th>Nevezési díj</th>
+        <th>Kezdés</th>
+        <th>Játékosok</th>
+        <th>Művelet</th>
+      </tr>
+      <% freeroll.forEach(t => { %>
+        <tr>
+          <td><%= t.id %></td>
+          <td><%= t.name %></td>
+          <td><%= t.entry_fee %> Zseton</td>
+          <td><%= t.start_time %></td>
+          <td><%= t.player_count %></td>
+          <td>
+            <form method="post" action="/admin/tournaments/<%= t.id %>/delete">
+              <button type="submit" class="delete-btn">Törlés</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </table>
+  </section>
+
+  <section class="tournament-section">
+    <h2>Buy-in versenyek</h2>
+    <table class="tournament-table">
+      <tr>
+        <th>ID</th>
+        <th>Név</th>
+        <th>Nevezési díj</th>
+        <th>Kezdés</th>
+        <th>Játékosok</th>
+        <th>Művelet</th>
+      </tr>
+      <% buyin.forEach(t => { %>
+        <tr>
+          <td><%= t.id %></td>
+          <td><%= t.name %></td>
+          <td><%= t.entry_fee %> Zseton</td>
+          <td><%= t.start_time %></td>
+          <td><%= t.player_count %></td>
+          <td>
+            <form method="post" action="/admin/tournaments/<%= t.id %>/delete">
+              <button type="submit" class="delete-btn">Törlés</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </table>
+  </section>
+</main>

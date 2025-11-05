@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title><%= title %> · QuizMaster</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+  <header class="headerbar">
+    <div class="brand">QuizMaster</div>
+    <nav>
+      <% if (user) { %>
+        <span>Üdv, <strong><%= user.username %></strong></span>
+        <span> Zseton: <strong id="user-balance"><%= user.tokens %></strong></span>
+        <span>• Credit: <strong><%= user.credits %></strong> Ft</span>
+        <a href="/dashboard">Főoldal</a>
+        <form method="post" action="/logout" style="display:inline;"><button>🚪 Kijelentkezés</button></form>
+      <% } else { %>
+        <a href="/login">Bejelentkezés</a>
+        <a href="/register">Regisztráció</a>
+        <a href="/register">Játékszabály</a>
+      <% } %>
+    </nav>
+  </header>
+  <main class="container">
+    <%- body %>
+  </main>
+</body>
+</html>

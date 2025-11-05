@@ -1,0 +1,21 @@
+<main>
+  <div class="login-container">
+    <h2>Bejelentkezés</h2>
+    <form method="post" action="/login">
+      <label for="username">Felhasználónév</label>
+      <input type="text" id="username" name="username" required>
+
+      <label for="password">Jelszó</label>
+      <input type="password" id="password" name="password" required>
+
+      <input type="submit" value="Belépés">
+    </form>
+  </div>
+
+<script>
+document.querySelector("form").addEventListener("submit", function() {
+  const username = document.querySelector("input[name='username']").value;
+  localStorage.setItem("username", username);
+});
+</script>
+</main>

@@ -1,0 +1,11 @@
+<main class="admin">
+  <h1>Verseny szerkesztése</h1>
+
+  <form action="/admin/tournaments/edit/<%= tournament.id %>" method="POST">
+    <input type="text" name="name" value="<%= tournament.name %>" required>
+    <input type="number" name="entry_fee" value="<%= tournament.entry_fee %>" min="0" required>
+    <input type="datetime-local" name="start_time" value="<%= tournament.start_time.slice(0,16) %>" required>
+    <input type="number" name="player_count" value="<%= tournament.player_count %>" min="0" required>
+    <button type="submit" class="btn">Mentés</button>
+  </form>
+</main>
