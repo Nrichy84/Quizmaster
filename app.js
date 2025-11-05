@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import expressLayouts from 'express-ejs-layouts';
 import { fileURLToPath } from 'url';
 
-import authRoutes from './routes/auth.js';
+import authRoutes from './src/routes/auth.js';
 import tournamentRoutes from './routes/tournaments.js';
 import playRoutes from './routes/play.js';
 import adminRoutes from './routes/admin.js';   // ✅ új admin útvonal
