@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import authRoutes from './src/routes/auth.js';
 import tournamentRoutes from './src/routes/tournaments.js';
 import playRoutes from './src/routes/play.js';
-import adminRoutes from './routes/admin.js';   // ✅ új admin útvonal
+import adminRoutes from './src/routes/admin.js';   // ✅ új admin útvonal
 import db from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
