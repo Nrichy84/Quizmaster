@@ -1086,7 +1086,7 @@ function resumeGameAfterBreak(){
 document.addEventListener("DOMContentLoaded", () => {
   setInterval(() => {
     const now = new Date();
-    if (now.getMinutes() === 7 && now.getSeconds() === 0 && !gamePaused) {
+    if (now.getMinutes() === 50 && now.getSeconds() === 0 && !gamePaused) {
       pauseGameForBreak();
     }
   }, 1000);
@@ -1095,3 +1095,4 @@ start();
 </script>
 </body>
 </html>
+
