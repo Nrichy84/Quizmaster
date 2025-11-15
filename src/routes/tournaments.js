@@ -6,48 +6,43 @@ const router = express.Router();
 
 // 🟢 Versenyek listázása típus szerint
 router.get('/tournaments', requireAuth, (req, res) => {
-  const type = req.query.type || 'free'; // alapértelmezett: játékpénzes
-
+  const type = req.query.type || 'free';
   const normalizedType =
     type === 'Play Money' ? 'free' :
-    type === 'Freeroll' ? 'freeroll' :
-    type === 'Buy-in' ? 'buyin' :
+    type === 'Freeroll'   ? 'freeroll' :
+    type === 'Buy-in'     ? 'buyin'    :
     type.toLowerCase();
 
-  db.all(
-    `SELECT * FROM tournaments WHERE type = ? ORDER BY datetime(start_time) ASC`,
-    [normalizedType],
-    (err, tournaments) => {
-      if (err) {
-        console.error('❌ Hiba a versenyek lekérésekor:', err.message);
-        return res.status(500).send('Hiba történt az adatbázis lekérésekor.');
-      }
+  const sql = `
+    SELECT
+      t.*,
+      (SELECT COUNT(*) FROM tournament_players tp WHERE tp.tournament_id = t.id) AS joined_players,
+      (t.entry_fee * (SELECT COUNT(*) FROM tournament_players tp2 WHERE tp2.tournament_id = t.id)) AS computed_prize
+    FROM tournaments t
+    WHERE t.type = ?
+    ORDER BY datetime(t.start_time) ASC
+  `;
 
-      db.all(
-        `SELECT tournament_id FROM tournament_players WHERE user_id = ?`,
-        [req.session.user.id],
-        (err2, joined) => {
-          const joinedIds = joined ? joined.map(j => j.tournament_id) : [];
-          // ✅ Határidő ellenőrzés (pontosan a kezdés időpontjában)
-tournaments.forEach(t => {
-  const now = new Date();
-  const startTime = new Date(t.start_time.replace(' ', 'T'));
-  t.isExpired = now >= startTime; // ha elérte vagy túllépte a kezdést, lejárt
-});
-          console.log(
-            `🎯 ${normalizedType} típusú versenyek betöltve: ${tournaments.length} db (felhasználó csatlakozott: ${joinedIds.length})`
-          );
-
-          res.render('tournaments', {
-            title: 'Versenyek',
-            tournaments, 
-            type: normalizedType,
-            joinedIds,
-          });
-        }
-      );
+  db.all(sql, [normalizedType], (err, tournaments) => {
+    if (err) {
+      console.error('❌ Hiba a versenyek lekérésekor:', err.message);
+      return res.status(500).send('Hiba történt az adatbázis lekérésekor.');
     }
-  );
+
+    db.all(
+      `SELECT tournament_id FROM tournament_players WHERE user_id = ?`,
+      [req.session.user.id],
+      (err2, joined) => {
+        const joinedIds = joined ? joined.map(j => j.tournament_id) : [];
+        res.render('tournaments', {
+          title: 'Versenyek',
+          tournaments,
+          type: normalizedType,
+          joinedIds
+        });
+      }
+    );
+  });
 });
 
 // 🟢 Csatlakozás egy versenyhez

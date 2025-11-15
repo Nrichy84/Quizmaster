@@ -34,7 +34,7 @@
     <td><%= t.type %></td>
     <td><%= t.start_time %></td>
     <td><%= t.entry_fee %></td>
-    <td><%= t.prize_pool %></td>
+    <td><%= t.computed_prize || 0 %></td>
     <td>
       <button
   class="btn join-btn <%= alreadyJoined || t.isExpired ? 'joined' : '' %>"

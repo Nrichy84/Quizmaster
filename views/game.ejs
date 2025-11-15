@@ -123,7 +123,14 @@
     <div id="roundMsg"></div>
   </div>
 
+
+
 <script>
+  // 🔹 A bejelentkezett felhasználó neve elérhető a szerverről
+  const username = "<%= user.username %>";
+  // 🔹 A szerverről kapott tournament objektum
+const tournament = <%- JSON.stringify(tournament) %>;
+
 /* ================================
    KÉRDÉSEK – ITT SZERKESZTHETED
    ================================ */
@@ -909,8 +916,9 @@ function calculateFinalPrizes() {
   const totalPlayers = ranked.length;
 
   // 💵 Valódi nevezési díj (nem a stake!)
-  const entryFee = 10; // fallback biztonság kedvéért
-  const totalPrize = entryFee * totalPlayers;
+  // Valódi nevezési díj a tournament objektumból (ha van)
+const entryFee = tournament?.entry_fee || 10; // ha nincs megadva, marad a 10-es biztonsági érték
+const totalPrize = entryFee * totalPlayers;
   console.log(`💵 Teljes pot: ${totalPrize} zseton (${totalPlayers} játékos × ${entryFee} nevezési díj)`);
 
   // 🏅 Hány játékos kapjon nyereményt (felső 10%, de legalább 1)
@@ -927,7 +935,7 @@ function calculateFinalPrizes() {
   });
 
   // 👤 Saját játékos és nyeremény
-  const me = players.find(p => p.id === 1);
+  const me = players.find(p => p.name === username);
   const myPrize = prizeMap.get(me.id) || 0;
   const myRank = ranked.findIndex(p => p.id === me.id) + 1;
 
@@ -1086,7 +1094,7 @@ function resumeGameAfterBreak(){
 document.addEventListener("DOMContentLoaded", () => {
   setInterval(() => {
     const now = new Date();
-    if (now.getMinutes() === 50 && now.getSeconds() === 0 && !gamePaused) {
+    if (now.getMinutes() === 7 && now.getSeconds() === 0 && !gamePaused) {
       pauseGameForBreak();
     }
   }, 1000);
@@ -1095,4 +1103,3 @@ start();
 </script>
 </body>
 </html>
-
