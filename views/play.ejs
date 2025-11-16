@@ -100,7 +100,7 @@ function animateChipsToCenter(payMap){ return new Promise(res=>{ const center=ge
 function animateChipsFromCenterToWinners(winners,share){ return new Promise(res=>{ if(share<=0 || winners.length===0){ res(); return; } const center=getPotCenter(); const chips=winners.map(w=>{ const chip=makeChip(center.x,center.y,share); return {chip,pid:w.id}; });
   requestAnimationFrame(()=>{ chips.forEach(({chip,pid})=>{ const to=getPlayerCenter(pid); chip.style.left=to.x+'px'; chip.style.top=to.y+'px'; }); }); setTimeout(()=>{ chips.forEach(({chip})=>chip.remove()); res(); },750); }); }
 function flashWinners(winners){ winners.forEach(w=>{ const el=[...$table.querySelectorAll('.player')].find(d=>+d.dataset.pid===w.id); if(el){ el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1800);} }); }
-function startStakeDoubler(){ if(stakeInterval) clearInterval(stakeInterval); stakeInterval=setInterval(()=>{ stake*=2; updateInfo(); },5*60*1000); }
+function startStakeDoubler(){ if(stakeInterval) clearInterval(stakeInterval); stakeInterval=setInterval(()=>{ stake*=2; updateInfo(); },10*60*1000); }
 
 function endGame(){
   $question.textContent="Játék vége! Eredmények küldése…"; $answers.innerHTML=''; $roundMsg.textContent=''; stopRoundTimer(); if(stakeInterval) clearInterval(stakeInterval);

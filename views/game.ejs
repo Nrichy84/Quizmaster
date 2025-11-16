@@ -110,7 +110,7 @@
       </div>
   
       <!-- Tét emelés visszaszámláló -->
-<div id="raise-timer" class="raise-timer">Következő tét emelés: 03:00</div>
+<div id="raise-timer" class="raise-timer">Következő tét emelés: 10:00</div>
 
       <div id="infoBar">
         <div class="pill">⏱️ Idő: <span id="timer">15</span>s</div>
@@ -125,981 +125,551 @@
 
 
 
+<script src="/socket.io/socket.io.js"></script>
 <script>
-  // 🔹 A bejelentkezett felhasználó neve elérhető a szerverről
-  const username = "<%= user.username %>";
-  // 🔹 A szerverről kapott tournament objektum
-const tournament = <%- JSON.stringify(tournament) %>;
+  // Szerver által adott adatok
+  const username   = "<%= user.username %>";
+  const tournament = <%- JSON.stringify(tournament) %>;
 
-/* ================================
-   KÉRDÉSEK – ITT SZERKESZTHETED
-   ================================ */
-let questions = [
-{q:"Mi a fővárosa Svédországnak?", a:["Stockholm","Oslo","Helsinki","Koppenhága"], correct:0},
-{q:"Melyik évben kezdődött az I. világháború?", a:["1912","1914","1916","1918"], correct:1},
-{q:"Melyik zenekar adta ki a 'Bohemian Rhapsody'-t?", a:["Queen","The Beatles","Led Zeppelin","Pink Floyd"], correct:0},
-{q:"Melyik énekes adta ki a 'Shape of You'-t?", a:["Ed Sheeran","Justin Bieber","Shawn Mendes","Sam Smith"], correct:0},
-{q:"Melyik sorozatban szerepel Jon Snow?", a:["Game of Thrones","Vikings","The Witcher","Breaking Bad"], correct:0},
-{q:"Ki nyerte a 2021-es NBA döntőt?", a:["Milwaukee Bucks","Los Angeles Lakers","Golden State Warriors","Brooklyn Nets"], correct:0},
-{q:"Melyik évben jelent meg az első iPhone?", a:["2007","2005","2008","2006"], correct:0},
-{q:"Ki alakította Jack Sparrow kapitányt a 'Pirates of the Caribbean'-ben?", a:["Johnny Depp","Orlando Bloom","Geoffrey Rush","Ian McShane"], correct:0},
-{q:"Melyik énekes énekli a 'Rolling in the Deep'-et?", a:["Adele","Beyoncé","Rihanna","Taylor Swift"], correct:0},
-{q:"Melyik ország rendezte a 2018-as FIFA világbajnokságot?", a:["Oroszország","Brazília","Németország","Franciaország"], correct:0},
-{q:"Ki írta a 'Percy Jackson' könyvsorozatot?", a:["Rick Riordan","J.K. Rowling","Suzanne Collins","C.S. Lewis"], correct:0},
-{q:"Melyik sorozatban szerepel Walter White?", a:["Breaking Bad","Better Call Saul","The Sopranos","Mad Men"], correct:0},
-{q:"Ki rendezte a 'Titanic'-ot?", a:["James Cameron","Steven Spielberg","Peter Jackson","Christopher Nolan"], correct:0},
-{q:"Melyik film nyerte a 2020-as Oscar legjobb film díját?", a:["Parasite","1917","Joker","Once Upon a Time in Hollywood"], correct:0},
-{q:"Melyik csapat nyerte a 2022-es NBA döntőt?", a:["Golden State Warriors","Boston Celtics","Miami Heat","Milwaukee Bucks"], correct:0},
-{q:"Ki énekli a 'Bad Guy'-t?", a:["Billie Eilish","Ariana Grande","Dua Lipa","Katy Perry"], correct:0},
-{q:"Melyik sorozatban szerepel Eleven?", a:["Stranger Things","The Umbrella Academy","Riverdale","Dark"], correct:0},
-{q:"Ki alakította Joker-t a 2019-es filmben?", a:["Joaquin Phoenix","Heath Ledger","Jared Leto","Jack Nicholson"], correct:0},
-{q:"Melyik évben jelent meg a 'Game of Thrones' első évada?", a:["2011","2010","2012","2013"], correct:0},
-{q:"Melyik filmről szól a 'The Avengers'?", a:["Marvel szuperhősök","DC szuperhősök","Star Wars","X-Men"], correct:0},
-{q:"Ki játszotta a főszerepet a 'Forrest Gump'-ban?", a:["Tom Hanks","Leonardo DiCaprio","Brad Pitt","Matt Damon"], correct:0},
-{q:"Melyik énekesnő adta ki a 'Like a Prayer'-t?", a:["Madonna","Britney Spears","Christina Aguilera","Lady Gaga"], correct:0},
-{q:"Ki rendezte a 'Inception'-t?", a:["Christopher Nolan","Steven Spielberg","James Cameron","Quentin Tarantino"], correct:0},
-{q:"Melyik ország rendezte a 2006-os FIFA világbajnokságot?", a:["Németország","Olaszország","Franciaország","Brazília"], correct:0},
-{q:"Ki játszotta a főszerepet a 'Gladiátor'-ban?", a:["Russell Crowe","Brad Pitt","Tom Cruise","Leonardo DiCaprio"], correct:0},
-{q:"Melyik zenekar adta ki a 'Smells Like Teen Spirit'-et?", a:["Nirvana","Pearl Jam","Soundgarden","Alice in Chains"], correct:0},
-{q:"Melyik sorozatban szerepel Daenerys Targaryen?", a:["Game of Thrones","Vikings","The Witcher","Stranger Things"], correct:0},
-{q:"Ki énekli a 'Hello'-t?", a:["Adele","Beyoncé","Taylor Swift","Rihanna"], correct:0},
-{q:"Melyik évben jelent meg a 'The Dark Knight'?", a:["2008","2005","2010","2007"], correct:0},
-{q:"Ki rendezte a 'Pulp Fiction'-t?", a:["Quentin Tarantino","Steven Spielberg","James Cameron","Martin Scorsese"], correct:0},
-{q:"Melyik ország rendezte a 2014-es FIFA világbajnokságot?", a:["Brazília","Németország","Oroszország","Spanyolország"], correct:0},
-{q:"Ki alakította Iron Man-t a Marvel filmekben?", a:["Robert Downey Jr.","Chris Hemsworth","Chris Evans","Mark Ruffalo"], correct:0},
-{q:"Melyik sorozatban szerepel Sherlock Holmes?", a:["Sherlock","Elementary","House","Luther"], correct:0},
-{q:"Ki játszotta a főszerepet a 'The Wolf of Wall Street'-ben?", a:["Leonardo DiCaprio","Brad Pitt","Matt Damon","Johnny Depp"], correct:0},
-{q:"Melyik zenekar adta ki a 'Stairway to Heaven'-t?", a:["Led Zeppelin","The Beatles","Pink Floyd","Queen"], correct:0},
-{q:"Ki énekli a 'Bad Romance'-t?", a:["Lady Gaga","Madonna","Britney Spears","Ariana Grande"], correct:0},
-{q:"Melyik filmben szerepel Neo karaktere?", a:["Mátrix","Inception","Avatar","Star Wars"], correct:0},
-{q:"Ki rendezte a 'Avatar'-t?", a:["James Cameron","Steven Spielberg","Christopher Nolan","Peter Jackson"], correct:0},
-{q:"Melyik ország rendezte a 2010-es FIFA világbajnokságot?", a:["Dél-Afrika","Brazília","Németország","Olaszország"], correct:0},
-{q:"Ki játszotta a főszerepet a 'Pirates of the Caribbean'-ben?", a:["Johnny Depp","Orlando Bloom","Geoffrey Rush","Ian McShane"], correct:0},
-{q:"Melyik énekes adta ki a 'Blinding Lights'-t?", a:["The Weeknd","Drake","Justin Bieber","Shawn Mendes"], correct:0},
-{q:"Melyik sorozatban szerepel Walter White?", a:["Breaking Bad","Better Call Saul","The Sopranos","Mad Men"], correct:0},
-{q:"Ki rendezte a 'Django Unchained'-et?", a:["Quentin Tarantino","Martin Scorsese","Steven Spielberg","James Cameron"], correct:0},
-{q:"Melyik film nyerte a legjobb animációs Oscar díjat 2019-ben?", a:["Spider-Man: Into the Spider-Verse","Incredibles 2","Coco","Ralph Breaks the Internet"], correct:0},
-{q:"Ki játszotta a főszerepet a 'Fight Club'-ban?", a:["Brad Pitt","Edward Norton","Tom Cruise","Leonardo DiCaprio"], correct:0},
-{q:"Melyik zenekar adta ki a 'Hey Jude'-ot?", a:["The Beatles","The Rolling Stones","Queen","Pink Floyd"], correct:0},
-{q:"Ki énekli a 'Someone Like You'-t?", a:["Adele","Beyoncé","Rihanna","Taylor Swift"], correct:0},
-{q:"Melyik sorozatban szerepel Jon Snow?", a:["Game of Thrones","Vikings","The Witcher","Stranger Things"], correct:0},
-{q:"Ki rendezte a 'The Shining'-et?", a:["Stanley Kubrick","Alfred Hitchcock","Steven Spielberg","James Cameron"], correct:0},
-{q:"Melyik országban rendezik a Tour de France kerékpárversenyt?", a:["Franciaország","Olaszország","Spanyolország","Belgium"], correct:0},
-{q:"Ki játszotta a főszerepet a 'Inception'-ben?", a:["Leonardo DiCaprio","Joseph Gordon-Levitt","Tom Hardy","Cillian Murphy"], correct:0},
-{q:"Melyik énekes adta ki a 'Uptown Funk'-ot?", a:["Bruno Mars","Justin Timberlake","Pharrell Williams","Ed Sheeran"], correct:0},
-{q:"Melyik sorozatban szerepel Piper Chapman?", a:["Orange is the New Black","Breaking Bad","The Handmaid's Tale","Stranger Things"], correct:0},
-{q:"Ki rendezte a 'Shutter Island'-t?", a:["Martin Scorsese","Steven Spielberg","Christopher Nolan","James Cameron"], correct:0},
-{q:"Melyik ország rendezte a 2002-es FIFA világbajnokságot?", a:["Dél-Korea és Japán","Németország","Brazília","Franciaország"], correct:0},
-{q:"Ki játszotta a főszerepet a 'The Revenant'-ben?", a:["Leonardo DiCaprio","Tom Hardy","Brad Pitt","Matt Damon"], correct:0},
-{q:"Melyik zenekar adta ki a 'Hotel California'-t?", a:["Eagles","The Beatles","Queen","Pink Floyd"], correct:0},
-{q:"Ki énekli a 'Shallow'-t a 'A Star is Born'-ból?", a:["Lady Gaga","Beyoncé","Taylor Swift","Adele"], correct:0},
-{q:"Melyik sorozatban szerepel Rick Grimes?", a:["The Walking Dead","Breaking Bad","Game of Thrones","Stranger Things"], correct:0},
-{q:"Ki rendezte a 'The Wolf of Wall Street'-et?", a:["Martin Scorsese","Steven Spielberg","Quentin Tarantino","James Cameron"], correct:0},
-{q:"Melyik ország rendezte a 1998-as FIFA világbajnokságot?", a:["Franciaország","Brazília","Olaszország","Németország"], correct:0},
-{q:"Ki játszotta a főszerepet a 'The Matrix'-ban?", a:["Keanu Reeves","Laurence Fishburne","Hugo Weaving","Carrie-Anne Moss"], correct:0},
-{q:"Melyik énekes adta ki a 'Can’t Stop the Feeling!'-t?", a:["Justin Timberlake","Bruno Mars","Ed Sheeran","Shawn Mendes"], correct:0},
-{q:"Melyik sorozatban szerepel Buffy Summers?", a:["Buffy the Vampire Slayer","Charmed","Angel","Supernatural"], correct:0},
-{q:"Ki rendezte a 'Gravity'-t?", a:["Alfonso Cuarón","Christopher Nolan","James Cameron","Steven Spielberg"], correct:0},
-{q:"Melyik ország rendezte a 2000-es Sydney olimpiát?", a:["Ausztrália","USA","Kína","Görögország"], correct:0},
-{q:"Ki játszotta a főszerepet a 'Black Swan'-ban?", a:["Natalie Portman","Mila Kunis","Winona Ryder","Barbara Hershey"], correct:0},
-{q:"Melyik zenekar adta ki a 'Sweet Child o' Mine'-t?", a:["Guns N' Roses","Nirvana","Metallica","AC/DC"], correct:0},
-{q:"Ki énekli a 'Rolling in the Deep'-et?", a:["Adele","Beyoncé","Rihanna","Taylor Swift"], correct:0},
-{q:"Melyik sorozatban szerepel Tyrion Lannister?", a:["Game of Thrones","Vikings","The Witcher","Stranger Things"], correct:0},
-{q:"Ki rendezte a 'The Grand Budapest Hotel'-t?", a:["Wes Anderson","Steven Spielberg","Quentin Tarantino","Martin Scorsese"], correct:0},
-{q:"Melyik ország rendezte a 2016-os Rio olimpiát?", a:["Brazília","USA","Oroszország","Kína"], correct:0},
-{q:"Ki játszotta a főszerepet a 'La La Land'-ben?", a:["Ryan Gosling","Bradley Cooper","Ryan Reynolds","Leonardo DiCaprio"], correct:0},
-{q:"Melyik zenekar adta ki a 'Imagine'-t?", a:["John Lennon","The Beatles","Queen","Pink Floyd"], correct:0},
-{q:"Ki énekli a 'Hello' című dalt?", a:["Adele","Taylor Swift","Beyoncé","Rihanna"], correct:0},
-{q:"Melyik sorozatban szerepel Sheldon Cooper?", a:["The Big Bang Theory","Friends","How I Met Your Mother","Modern Family"], correct:0},
-{q:"Ki rendezte a 'Once Upon a Time in Hollywood'-ot?", a:["Quentin Tarantino","Steven Spielberg","Christopher Nolan","James Cameron"], correct:0},
-{q:"Melyik ország rendezte a 2008-as Peking olimpiát?", a:["Kína","USA","Olaszország","Görögország"], correct:0},
-{q:"Ki játszotta a főszerepet a 'Joker'-ben?", a:["Joaquin Phoenix","Heath Ledger","Jared Leto","Jack Nicholson"], correct:0},
-{q:"Melyik zenekar adta ki a 'Livin’ on a Prayer'-t?", a:["Bon Jovi","Queen","AC/DC","Nirvana"], correct:0},
-{q:"Ki énekli a 'Bad Guy'-t?", a:["Billie Eilish","Ariana Grande","Dua Lipa","Katy Perry"], correct:0},
-{q:"Melyik bolygó a Naphoz legközelebb esik?", a:["Merkúr","Vénusz","Föld","Mars"], correct:0},
-{q:"Ki volt az első ember a Holdon?", a:["Neil Armstrong","Buzz Aldrin","Yuri Gagarin","Michael Collins"], correct:0},
-{q:"Melyik ország fővárosa Bécs?", a:["Ausztria","Németország","Svájc","Magyarország"], correct:0},
-{q:"Melyik évben kezdődött a II. világháború?", a:["1939","1914","1945","1937"], correct:0},
-{q:"Melyik a legnagyobb óceán a Földön?", a:["Csendes-óceán","Atlanti-óceán","Indiai-óceán","Északi-óceán"], correct:0},
-{q:"Mi az emberi test legnagyobb szerve?", a:["Bőr","Máj","Tüdő","Szív"], correct:0},
-{q:"Ki festette a 'Mona Lisát'?", a:["Leonardo da Vinci","Michelangelo","Raphael","Caravaggio"], correct:0},
-{q:"Melyik elem szimbóluma az O2?", a:["Oxigén","Nitrogén","Hidrogén","Szén"], correct:0},
-{q:"Melyik országban található a Machu Picchu?", a:["Peru","Chile","Brazília","Argentína"], correct:0},
-{q:"Mi a fénysebesség a vákuumban kb?", a:["300 000 km/s","150 000 km/s","1 000 000 km/s","30 000 km/s"], correct:0},
-{q:"Ki írta a 'Rómeó és Júlia'-t?", a:["William Shakespeare","Charles Dickens","Jane Austen","Mark Twain"], correct:0},
-{q:"Melyik kontinensen található Szahara sivatag?", a:["Afrika","Ázsia","Ausztrália","Észak-Amerika"], correct:0},
-{q:"Mi a víz kémiai képlete?", a:["H2O","CO2","NaCl","O2"], correct:0},
-{q:"Melyik országban van a Nagy-korallzátony?", a:["Ausztrália","USA","Brazília","Dél-Afrika"], correct:0},
-{q:"Ki volt Magyarország első királya?", a:["Szent István","Mátyás király","IV. Béla","Károly Róbert"], correct:0},
-{q:"Melyik évben omlott le a berlini fal?", a:["1989","1991","1987","1990"], correct:0},
-{q:"Melyik bolygón van a Nagy Vörös Folt?", a:["Jupiter","Mars","Saturnusz","Vénusz"], correct:0},
-{q:"Mi a legnagyobb állat a Földön?", a:["Kék bálna","Elefánt","Bálnadelfin","Nílusi krokodil"], correct:0},
-{q:"Ki volt az USA első elnöke?", a:["George Washington","Abraham Lincoln","Thomas Jefferson","John Adams"], correct:0},
-{q:"Melyik ország zászlaján van egy piros nap?", a:["Japán","Kína","Dél-Korea","Thaiföld"], correct:0},
-{q:"Mi az atommag töltése?", a:["Pozitív","Negatív","Semleges","Vegyes"], correct:0},
-{q:"Melyik évben fedezte fel Kolumbusz Amerikát?", a:["1492","1490","1500","1485"], correct:0},
-{q:"Mi a Föld legmélyebb pontja?", a:["Mariana-árok","Gibraltári-szoros","Nílus mélye","Grand Canyon"], correct:0},
-{q:"Ki írta a 'Háború és béke'-t?", a:["Lev Tolsztoj","Fjodor Dosztojevszkij","Anton Pavlovics Csehov","Ivan Turgenyev"], correct:0},
-{q:"Melyik országban található a Kilimandzsáró?", a:["Tanzánia","Kenya","Uganda","Egyiptom"], correct:0},
-{q:"Mi az emberi test legkisebb csontja?", a:["Üllőcsont","Kalapács csont","Sarkcsont","Lapocka"], correct:0},
-{q:"Ki fedezte fel a gravitáció törvényét?", a:["Isaac Newton","Albert Einstein","Galileo Galilei","Nikola Tesla"], correct:0},
-{q:"Melyik ország fővárosa Budapest?", a:["Magyarország","Ausztria","Szlovákia","Románia"], correct:0},
-{q:"Mi az első elem a periódusos rendszerben?", a:["Hidrogén","Hélium","Oxygen","Nitrogén"], correct:0},
-{q:"Melyik kontinensen van az Amazonas esőerdő?", a:["Dél-Amerika","Afrika","Ázsia","Észak-Amerika"], correct:0},
-{q:"Melyik magyar város híres a fürdőiről?", a:["Hévíz","Szeged","Debrecen","Pécs"], correct:0},
-{q:"Melyik évben kezdődött az I. világháború?", a:["1914","1918","1939","1905"], correct:0},
-{q:"Mi a Föld legnagyobb sivataga?", a:["Sahara","Gobi","Kalahári","Arab-sivatag"], correct:0},
-{q:"Ki írta a '1984' című regényt?", a:["George Orwell","Aldous Huxley","Ray Bradbury","Jules Verne"], correct:0},
-{q:"Melyik bolygót nevezik vörös bolygónak?", a:["Mars","Vénusz","Jupiter","Merkúr"], correct:0},
-{q:"Melyik ország fővárosa Lisszabon?", a:["Portugália","Spanyolország","Olaszország","Franciaország"], correct:0},
-{q:"Mi az elemi részecske neve, ami negatív töltésű?", a:["Elektron","Proton","Neutron","Fotonn"], correct:0},
-{q:"Ki volt az ókori Egyiptom legismertebb fáraója?", a:["Tutanhamon","Ramszesz II","Kheopsz","Hatshepsut"], correct:0},
-{q:"Melyik országban található az Eiffel-torony?", a:["Franciaország","Olaszország","Spanyolország","Belgium"], correct:0},
-{q:"Mi a Naprendszer legnagyobb bolygója?", a:["Jupiter","Szaturnusz","Föld","Mars"], correct:0},
-{q:"Ki volt az ókori görög filozófus, aki tanította Arisztotelészt?", a:["Platón","Szókratész","Pitagorasz","Epikurosz"], correct:0},
-{q:"Melyik évben jött létre az ENSZ?", a:["1945","1919","1939","1950"], correct:0},
-{q:"Mi a leggyakoribb elem a Föld légkörében?", a:["Nitrogén","Oxigén","Argon","Szén-dioxid"], correct:0},
-{q:"Melyik országban van a Taj Mahal?", a:["India","Pakisztán","Nepál","Banglades"], correct:0},
-{q:"Mi az emberi testben található legerősebb izom?", a:["Rágóizom","Szívizom","Combizom","Vádli"], correct:0},
-{q:"Ki írta a 'Don Quijote'-ot?", a:["Miguel de Cervantes","Victor Hugo","Mark Twain","Homer"], correct:0},
-{q:"Melyik országban található az Angkor Wat templom?", a:["Kambodzsa","Thaiföld","Laosz","Vietnam"], correct:0},
-{q:"Mi a leggyorsabb szárazföldi állat?", a:["Gepárd","Oroszlán","Tigris","Szervál"], correct:0},
-{q:"Ki volt a francia forradalom vezetője?", a:["Robespierre","Napóleon","Louis XVI","Danton"], correct:0},
-{q:"Melyik évben fedezték fel Amerikát?", a:["1492","1500","1480","1512"], correct:0},
-{q:"Mi a fény egysége?", a:["Lumen","Watt","Volt","Amper"], correct:0},
-{q:"Melyik országban található a Mount Everest?", a:["Nepál","India","Kína","Bhután"], correct:0},
-{q:"Ki írta a 'Hamlet'-et?", a:["William Shakespeare","John Milton","Geoffrey Chaucer","Oscar Wilde"], correct:0},
-{q:"Melyik földrajzi szélességi kör felel meg az Egyenlítőnek?", a:["0°","45°","90°","23,5°"], correct:0},
-{q:"Mi az emberi test legnagyobb belső szerve?", a:["Máj","Tüdő","Vese","Szív"], correct:0},
-{q:"Melyik évben kezdődött a hidegháború?", a:["1947","1945","1950","1939"], correct:0},
-{q:"Melyik ország fővárosa Stockholm?", a:["Svédország","Norvégia","Finnország","Dánia"], correct:0},
-{q:"Mi a Föld második legnagyobb kontinense?", a:["Afrika","Ázsia","Észak-Amerika","Dél-Amerika"], correct:0},
-{q:"Ki fedezte fel az Amerikát?", a:["Kolumbusz Kristóf","Vasco da Gama","Ferdinánd Magellán","James Cook"], correct:0},
-{q:"Melyik a legkisebb kontinens?", a:["Ausztrália","Európa","Antarktisz","Afrika"], correct:0},
-{q:"Mi az a fotoszintézis?", a:["A növények energiatermelése napfényből","A növények légzése","A talaj termékenyítése","A növények szaporodása"], correct:0},
-{q:"Melyik ország fővárosa Prága?", a:["Csehország","Szlovákia","Lengyelország","Magyarország"], correct:0},
-{q:"Ki volt a 'Nagy Sándor'?", a:["Makedón hadvezér","Római császár","Egyiptomi fáraó","Perzsa király"], correct:0},
-{q:"Mi a leggyakoribb gáz a Napban?", a:["Hidrogén","Hélium","Oxigén","Nitrogén"], correct:0},
-{q:"Melyik országban található a Sagrada Familia?", a:["Spanyolország","Olaszország","Portugália","Franciaország"], correct:0},
-{q:"Mi a Föld középpontjában található?", a:["Vas-nikkel mag","Víztömeg","Szén","Oxigén"], correct:0},
-{q:"Ki fedezte fel a radioaktivitást?", a:["Henri Becquerel","Marie Curie","Albert Einstein","Isaac Newton"], correct:0},
-{q:"Melyik évben oszlott fel a Szovjetunió?", a:["1991","1989","1990","1992"], correct:0},
-{q:"Mi az auróra borealis?", a:["Sarki fény","Vulkánkitörés","Földrengés","Óceáni áramlat"], correct:0},
-{q:"Melyik országban van a Niagara-vízesés?", a:["USA és Kanada","Mexikó","Brazília","Argentína"], correct:0},
-{q:"Mi a leggyorsabb vízi állat?", a:["Délkeleti uszonyos cápa","Delfin","Tengeri teknős","Barrakuda"], correct:0},
-{q:"Ki volt az első női Nobel-díjas?", a:["Marie Curie","Rosalind Franklin","Ada Lovelace","Elizabeth Blackburn"], correct:0},
-{q:"Melyik országban található a Petra ősi városa?", a:["Jordánia","Izrael","Egyiptom","Szíria"], correct:0},
-{q:"Mi a legnagyobb szerv az emberi testben?", a:["Bőr","Máj","Tüdő","Vese"], correct:0},
-{q:"Melyik évben jelent meg a Titanic hajó?", a:["1912","1905","1910","1915"], correct:0},
-{q:"Ki fedezte fel a penicillint?", a:["Alexander Fleming","Louis Pasteur","Robert Koch","Marie Curie"], correct:0},
-{q:"Melyik ország fővárosa Oslo?", a:["Norvégia","Svédország","Finnország","Dánia"], correct:0},
-{q:"Mi a legnagyobb bolygó a Naprendszerben?", a:["Jupiter","Szaturnusz","Föld","Mars"], correct:0},
-{q:"Ki írta a 'Macbeth'-et?", a:["William Shakespeare","Charles Dickens","Leo Tolstoy","Jane Austen"], correct:0},
-{q:"Melyik folyó a leghosszabb a világon?", a:["Nílus","Amazonas","Jangce","Mississippi"], correct:0},
-{q:"Melyik ország fővárosa Kairó?", a:["Egyiptom","Szaúd-Arábia","Líbia","Algéria"], correct:0},
-{q:"Mi a legkisebb csillag a Naprendszerünkben?", a:["Plútó (nem bolygó)","Merkúr","Mars","Vénusz"], correct:0},
-{q:"Ki volt az ókori Róma legismertebb hadvezére?", a:["Julius Caesar","Augustus","Nero","Cicero"], correct:0},
-{q:"Melyik évben alapították az Európai Uniót?", a:["1993","1957","2000","1985"], correct:0},
-{q:"Mi a földrajzi koordináta, ami az Északi-sarkot jelöli?", a:["90° É","0°","180°","45° É"], correct:0},
-{q:"Melyik országban található a Colosseum?", a:["Olaszország","Görögország","Spanyolország","Franciaország"], correct:0},
-{q:"Mi a legnagyobb emlős a szárazföldön?", a:["Afrikai elefánt","Indiai elefánt","Bálna","Rhinoceros"], correct:0},
-{q:"Ki volt a középkori Európa legismertebb orvosa?", a:["Avicenna","Galen","Hippokratész","Paracelsus"], correct:0},
-{q:"Melyik országban található a Galápagos-szigetek?", a:["Ecuador","Peru","Chile","Kolumbia"], correct:0},
-{q:"Mi az atommagban található semleges részecske neve?", a:["Neutron","Proton","Elektron","Fotonn"], correct:0},
-{q:"Melyik ország nyerte a 2018-as labdarúgó világbajnokságot?", a:["Franciaország","Horvátország","Brazília","Németország"], correct:0},
-{q:"Melyik sportágban használják a természtet: 'tee'?", a:["Golf","Röplabda","Tenisz","Kosárlabda"], correct:0},
-{q:"Ki a legtöbb Grand Slamet nyert férfi teniszező 2025-ig?", a:["Novak Djokovic","Rafael Nadal","Roger Federer","Pete Sampras"], correct:0},
-{q:"Melyik ország rendezte a 2016-os nyári olimpiát?", a:["Brazília","Kína","Anglia","Oroszország"], correct:0},
-{q:"Melyik sportágban található a 'slalom' versenyszám?", a:["Sí","Úszás","Atlétika","Kajak-kenu"], correct:0},
-{q:"Hány játékos van egy kosárlabda csapatban egyszerre a pályán?", a:["5","6","7","4"], correct:0},
-{q:"Melyik ország a futball Premier League otthona?", a:["Anglia","Spanyolország","Olaszország","Németország"], correct:0},
-{q:"Melyik sporthoz kapcsolódik a 'spike' kifejezés?", a:["Röplabda","Tenisz","Asztalitenisz","Labdarúgás"], correct:0},
-{q:"Melyik sportágban van a Tour de France?", a:["Kerékpározás","Futás","Úszás","Sífutás"], correct:0},
-{q:"Ki nyerte a 2023-as Forma-1 világbajnokságot?", a:["Max Verstappen","Lewis Hamilton","Charles Leclerc","Sergio Pérez"], correct:0},
-{q:"Melyik sportban van 'scrum'?", a:["Rugby","Kosárlabda","Labdarúgás","Jégkorong"], correct:0},
-{q:"Melyik ország nyerte a legtöbb olimpiai aranyérmet 2020-ig?", a:["USA","Kína","Németország","Oroszország"], correct:0},
-{q:"Melyik sportban használják a 'racket' kifejezést?", a:["Tenisz","Kosárlabda","Röplabda","Labdarúgás"], correct:0},
-{q:"Melyik sportágban van a 'home run'?", a:["Baseball","Kricket","Röplabda","Jégkorong"], correct:0},
-{q:"Hány perc egy profi labdarúgó mérkőzés?", a:["90","60","120","75"], correct:0},
-{q:"Ki a legismertebb argentin labdarúgó, aki 2022-ben világbajnok lett?", a:["Lionel Messi","Diego Maradona","Sergio Agüero","Paulo Dybala"], correct:0},
-{q:"Melyik sportban van a 'free throw'?", a:["Kosárlabda","Röplabda","Labdarúgás","Tenisz"], correct:0},
-{q:"Melyik országban jött létre a jégkorong?", a:["Kanada","USA","Oroszország","Svédország"], correct:0},
-{q:"Melyik sportágban van a 'puck'?", a:["Jégkorong","Rugby","Kricket","Lacrosse"], correct:0},
-{q:"Melyik sportban használják a 'offside' szabályt?", a:["Labdarúgás","Kosárlabda","Röplabda","Tenisz"], correct:0},
-{q:"Ki nyerte a 2023-as NBA bajnokságot?", a:["Denver Nuggets","Golden State Warriors","Boston Celtics","Milwaukee Bucks"], correct:0},
-{q:"Melyik sporthoz kapcsolódik a 'touchdown' kifejezés?", a:["Amerikai futball","Rugby","Labdarúgás","Kosárlabda"], correct:0},
-{q:"Melyik sportágban van a 'kick-off'?", a:["Labdarúgás","Röplabda","Rugby","Tenisz"], correct:0},
-{q:"Melyik ország rendezte a 2000-es nyári olimpiát?", a:["Ausztrália","Kína","Görögország","USA"], correct:0},
-{q:"Melyik sporthoz kapcsolódik a 'slapshot'?", a:["Jégkorong","Baseball","Kosárlabda","Labdarúgás"], correct:0},
-{q:"Ki nyerte a legtöbb Tour de France győzelmet férfiaknál?", a:["Eddy Merckx","Bernard Hinault","Miguel Indurain","Jacques Anquetil"], correct:0},
-{q:"Hány játékos van egy röplabda csapatban pályán egyszerre?", a:["6","5","7","4"], correct:0},
-{q:"Melyik sportban van a 'penalty kick'?", a:["Labdarúgás","Rugby","Kricket","Tenisz"], correct:0},
-{q:"Melyik ország rendezte a 2014-es labdarúgó világbajnokságot?", a:["Brazília","Németország","Oroszország","Dél-Afrika"], correct:0},
-{q:"Melyik sporthoz tartozik a 'slam dunk'?", a:["Kosárlabda","Röplabda","Labdarúgás","Tenisz"], correct:0},
-{q:"Melyik sportban van a 'corner kick'?", a:["Labdarúgás","Röplabda","Jégkorong","Kricket"], correct:0},
-{q:"Ki a legtöbb gólt szerző labdarúgó a világon 2025-ig?", a:["Cristiano Ronaldo","Lionel Messi","Pele","Romário"], correct:0},
-{q:"Melyik ország rendezte a 2018-as téli olimpiát?", a:["Dél-Korea","Japán","Kanada","Norvégia"], correct:0},
-{q:"Melyik sportban van a 'volley' kifejezés?", a:["Tenisz","Röplabda","Kosárlabda","Asztalitenisz"], correct:0},
-{q:"Melyik ország nyerte az 1998-as labdarúgó világbajnokságot?", a:["Franciaország","Brazília","Olaszország","Németország"], correct:0},
-{q:"Ki nyerte a legtöbb olimpiai aranyérmet úszásban?", a:["Michael Phelps","Mark Spitz","Ryan Lochte","Ian Thorpe"], correct:0},
-{q:"Melyik sportban használják a 'net' kifejezést?", a:["Tenisz","Kosárlabda","Röplabda","Labdarúgás"], correct:0},
-{q:"Hány játékos van egy jégkorong csapatban egyszerre a pályán?", a:["6","5","7","4"], correct:0},
-{q:"Melyik ország nyerte a legtöbb futball világbajnokságot?", a:["Brazília","Németország","Olaszország","Argentina"], correct:0},
-{q:"Melyik sporthoz tartozik a 'bunt' kifejezés?", a:["Baseball","Kricket","Tenisz","Kosárlabda"], correct:0},
-{q:"Melyik sportban van a 'tee-off'?", a:["Golf","Röplabda","Tenisz","Asztalitenisz"], correct:0},
-{q:"Ki a legeredményesebb Forma-1 pilóta 2025-ig?", a:["Lewis Hamilton","Michael Schumacher","Sebastian Vettel","Max Verstappen"], correct:0},
-{q:"Melyik sportban van a 'dribble' kifejezés?", a:["Kosárlabda","Labdarúgás","Röplabda","Tenisz"], correct:0},
-{q:"Melyik ország rendezte az első modern olimpiát 1896-ban?", a:["Görögország","Franciaország","Olaszország","USA"], correct:0},
-{q:"Melyik sportban van a 'hook shot'?", a:["Kosárlabda","Röplabda","Tenisz","Labdarúgás"], correct:0},
-{q:"Ki nyerte a 2022-es labdarúgó világbajnokságot?", a:["Argentína","Franciaország","Brazília","Németország"], correct:0},
-{q:"Melyik sportban használják a 'stroke' kifejezést?", a:["Úszás","Atlétika","Tenisz","Kosárlabda"], correct:0},
-{q:"Melyik sportban van a 'tee'?", a:["Golf","Röplabda","Tenisz","Asztalitenisz"], correct:0},
-{q:"Melyik ország nyerte az első labdarúgó világbajnokságot 1930-ban?", a:["Uruguay","Brazília","Olaszország","Argentina"], correct:0},
-{q:"Melyik sportban van a 'knockout'?", a:["Box","Kick-box","MMA","Összes fenti"], correct:3},
-{q:"Melyik sportban van a 'set' kifejezés?", a:["Tenisz","Röplabda","Kosárlabda","Asztalitenisz"], correct:0},
-{q:"Ki nyerte a legtöbb Formula-1 világbajnoki címet?", a:["Michael Schumacher","Lewis Hamilton","Juan Manuel Fangio","Sebastian Vettel"], correct:1},
-{q:"Melyik ország rendezte a 1992-es nyári olimpiát?", a:["Spanyolország","USA","Franciaország","Olaszország"], correct:0},
-{q:"Melyik sporthoz tartozik a 'touchline' kifejezés?", a:["Rugby","Labdarúgás","Kricket","Asztalitenisz"], correct:1},
-{q:"Melyik sportban van a 'double fault'?", a:["Tenisz","Röplabda","Kosárlabda","Labdarúgás"], correct:0},
-{q:"Ki nyerte a legtöbb Wimbledon-győzelmet férfiaknál?", a:["Roger Federer","Pete Sampras","Rafael Nadal","Novak Djokovic"], correct:0},
-{q:"Melyik ország rendezte a 2010-es labdarúgó világbajnokságot?", a:["Dél-Afrika","Brazília","Németország","Anglia"], correct:0},
-{q:"Melyik sportban van a 'line-out'?", a:["Rugby","Labdarúgás","Kosárlabda","Kricket"], correct:0},
-{q:"Melyik sportban használják a 'ace' kifejezést?", a:["Tenisz","Kosárlabda","Röplabda","Baseball"], correct:0},
-{q:"Hány játékos van egy amerikai futball csapatban egyszerre a pályán?", a:["11","10","12","9"], correct:0},
-{q:"Melyik sportban van a 'layup'?", a:["Kosárlabda","Labdarúgás","Röplabda","Tenisz"], correct:0},
-{q:"Ki nyerte a legtöbb Tour de France győzelmet 2025-ig?", a:["Eddy Merckx","Bernard Hinault","Miguel Indurain","Jacques Anquetil"], correct:0},
-{q:"Melyik sportban használják a 'backhand' kifejezést?", a:["Tenisz","Röplabda","Kosárlabda","Labdarúgás"], correct:0},
-{q:"Melyik ország nyerte a 2002-es labdarúgó világbajnokságot?", a:["Brazília","Németország","Törökország","Dél-Korea"], correct:0},
-{q:"Melyik sportban van a 'kickoff'?", a:["Labdarúgás","Rugby","Amerikai futball","Összes fenti"], correct:3},
-{q:"Melyik sporthoz tartozik a 'free throw'?", a:["Kosárlabda","Röplabda","Tenisz","Labdarúgás"], correct:0},
-{q:"Melyik ország rendezte a 1988-as nyári olimpiát?", a:["Dél-Korea","USA","Olaszország","Kanada"], correct:0},
-{q:"Ki a legtöbb olimpiai aranyérmet szerző női sportoló?", a:["Larisa Latynina","Paavo Nurmi","Michael Phelps","Simone Biles"], correct:0},
-{q:"Melyik sportban használják a 'set point' kifejezést?", a:["Tenisz","Kosárlabda","Röplabda","Asztalitenisz"], correct:0},
-{q:"Melyik ország nyerte a 2019-es női labdarúgó világbajnokságot?", a:["USA","Hollandia","Svédország","Anglia"], correct:0},
-{q:"Melyik sportban van a 'pole position'?", a:["Forma-1","MotoGP","IndyCar","Összes fenti"], correct:3},
-{q:"Melyik sportágban van a 'grand slam' kifejezés?", a:["Tenisz","Golf","Kricket","Összes fenti"], correct:3},
-{q:"Ki nyerte a legtöbb Golden Globe díjat 2025-ig?", a:["Nem sportkérdés, kihagyjuk"], correct:0},
-{q:"Melyik ország nyerte a 2021-es labdarúgó Európa-bajnokságot?", a:["Olaszország","Anglia","Spanyolország","Franciaország"], correct:0},
-{q:"Ki tartja a 100 méteres síkfutás világrekordját 2025-ig?", a:["Usain Bolt","Tyson Gay","Yohan Blake","Justin Gatlin"], correct:0},
-{q:"Melyik sporthoz tartozik a 'maul' kifejezés?", a:["Rugby","Labdarúgás","Kricket","Kosárlabda"], correct:0},
-{q:"Hány játékos van egy vízilabda csapatban egyszerre a medencében?", a:["7","6","8","9"], correct:0},
-{q:"Melyik ország rendezte a 2008-as nyári olimpiát?", a:["Kína","USA","Olaszország","Görögország"], correct:0},
-{q:"Melyik sportban van a 'lay-down' kifejezés?", a:["Tenisz","Röplabda","Nem létező kifejezés","Kosárlabda"], correct:2},
-{q:"Melyik ország nyerte a legtöbb krikett világbajnokságot?", a:["Ausztrália","India","Anglia","Pakisztán"], correct:0},
-{q:"Melyik sportágban van a 'sprint' versenyszám?", a:["Atlétika","Úszás","Kerékpár","Összes fenti"], correct:3},
-{q:"Ki nyerte a legtöbb NBA MVP díjat 2025-ig?", a:["LeBron James","Michael Jordan","Kareem Abdul-Jabbar","Bill Russell"], correct:2},
-{q:"Melyik sportban van a 'cross-country' kifejezés?", a:["Sífutás","Kerékpár","Atlétika","Összes fenti"], correct:3},
-{q:"Melyik ország nyerte a 2015-ös női labdarúgó világbajnokságot?", a:["USA","Japán","Németország","Norvégia"], correct:0},
-{q:"Melyik sportban van a 'backboard' kifejezés?", a:["Kosárlabda","Röplabda","Tenisz","Labdarúgás"], correct:0},
-{q:"Hány játékos van egy krikett csapatban?", a:["11","10","12","9"], correct:0},
-{q:"Melyik sportban használják a 'pickle' kifejezést?", a:["Nem hivatalos sportkifejezés","Kosárlabda","Tenisz","Röplabda"], correct:0},
-{q:"Melyik ország nyerte a 2010-es női labdarúgó világbajnokságot?", a:["Japán","USA","Németország","Brazília"], correct:0},
-{q:"Melyik sportban van a 'free kick'?", a:["Labdarúgás","Rugby","Amerikai futball","Kricket"], correct:0},
-{q:"Melyik ország rendezte a 1980-as nyári olimpiát?", a:["Szovjetunió","USA","Olaszország","Kanada"], correct:0},
-{q:"Ki nyerte a 2023-as férfi labdarúgó BL döntőt?", a:["Manchester City","Inter Milan","Real Madrid","Bayern München"], correct:0},
-{q:"Melyik sporthoz tartozik a 'stoppie' kifejezés?", a:["Motorsport","Kerékpár","Skateboard","Összes fenti"], correct:3},
-{q:"Hány játékos van egy rugby csapatban pályán?", a:["15","13","11","12"], correct:0},
-{q:"Melyik sportban van a 'drop shot'?", a:["Tenisz","Kosárlabda","Röplabda","Labdarúgás"], correct:0},
-{q:"Melyik ország nyerte a 2019-es férfi labdarúgó Copa América-t?", a:["Brazília","Argentina","Chile","Uruguay"], correct:0},
-{q:"Melyik sportban van a 'volley'?", a:["Röplabda","Tenisz","Kosárlabda","Labdarúgás"], correct:1},
-{q:"Melyik ország rendezte a 1994-es labdarúgó világbajnokságot?", a:["USA","Brazília","Olaszország","Svédország"], correct:0},
-{q:"Ki nyerte a legtöbb olimpiai aranyérmet női tornászok között?", a:["Larisa Latynina","Nadia Comăneci","Simone Biles","Shannon Miller"], correct:0},
-{q:"Melyik sporthoz tartozik a 'sprint relay'?", a:["Atlétika","Úszás","Kerékpár","Összes fenti"], correct:3},
-{q:"Hány játékos van egy kézilabda csapatban pályán egyszerre?", a:["7","6","8","9"], correct:0},
-{q:"Melyik ország rendezte a 1972-es nyári olimpiát?", a:["Németország","USA","Szovjetunió","Japán"], correct:0},
-{q:"Melyik sportban van a 'kick return'?", a:["Amerikai futball","Labdarúgás","Rugby","Röplabda"], correct:0},
-{q:"Ki nyerte a legtöbb Formula-1 futamot 2025-ig?", a:["Lewis Hamilton","Michael Schumacher","Sebastian Vettel","Ayrton Senna"], correct:0},
-{q:"Melyik sportban van a 'crossover' kifejezés?", a:["Kosárlabda","Röplabda","Labdarúgás","Tenisz"], correct:0},
-{q:"Melyik ország nyerte a 2011-es férfi labdarúgó világbajnokságot?", a:["Nem volt férfi VB 2011-ben","Spanyolország","Brazília","Olaszország"], correct:0},
-{q:"Melyik sportban van a 'free style' versenyszám?", a:["Úszás","Sí","Kerékpár","Összes fenti"], correct:3},
-{q:"Hány pontot ér egy touchdown az amerikai futballban?", a:["6","7","3","5"], correct:0},
-{q:"Melyik sportban van a 'grand slam' kifejezés?", a:["Tenisz","Golf","Kricket","Összes fenti"], correct:3},
-{q:"Melyik ország rendezte a 1968-as nyári olimpiát?", a:["Mexikó","USA","Szovjetunió","Japán"], correct:0},
-{q:"Ki nyerte a 2020-as Tour de France-t?", a:["Tadej Pogačar","Primož Roglič","Chris Froome","Egan Bernal"], correct:0},
-{q:"Melyik sportban van a 'set piece' kifejezés?", a:["Labdarúgás","Röplabda","Kosárlabda","Tenisz"], correct:0},
-{q:"Melyik sporthoz tartozik a 'hook' kifejezés?", a:["Box","Kick-box","MMA","Összes fenti"], correct:3},
-{q:"Melyik ország nyerte a 2017-es férfi labdarúgó Konföderációs Kupát?", a:["Németország","Chile","Portugália","Brazília"], correct:0},
-{q:"Melyik sportban van a 'puck'?", a:["Jégkorong","Rugby","Kricket","Lacrosse"], correct:0},
-{q:"Hány játékos van egy amerikai kosárlabda csapatban egyszerre?", a:["5","6","7","4"], correct:0},
-{q:"Melyik ország rendezte a 1998-as téli olimpiát?", a:["Japán","Norvégia","Kanada","USA"], correct:0},
-{q:"Melyik sportban van a 'power play'?", a:["Kricket","Jégkorong","Lacrosse","Összes fenti"], correct:3},
-{q:"Melyik ország nyerte a 2018-as női labdarúgó világbajnokságot?", a:["USA","Németország","Anglia","Franciaország"], correct:0},
-{q:"Melyik sporthoz tartozik a 'slam dunk'?", a:["Kosárlabda","Röplabda","Labdarúgás","Tenisz"], correct:0},
-{q:"Ki nyerte a legtöbb Wimbledon-győzelmet nőknél?", a:["Martina Navratilova","Serena Williams","Steffi Graf","Chris Evert"], correct:0},
-{q:"Melyik sportban van a 'kickboard'?", a:["Úszás","Surf","Röplabda","Tenisz"], correct:0},
-{q:"Hány pontot ér egy büntetőrúgás labdarúgásban?", a:["1","2","3","0"], correct:0},
-{q:"Melyik ország nyerte a 2006-os labdarúgó világbajnokságot?", a:["Olaszország","Franciaország","Brazília","Németország"], correct:0},
-{q:"Melyik sportban van a 'halfpipe' versenyszám?", a:["Snowboard","Sí","Skateboard","Összes fenti"], correct:3},
-{q:"Melyik sportban használják a 'deuce' kifejezést?", a:["Tenisz","Kosárlabda","Röplabda","Labdarúgás"], correct:0},
-{q:"Ki nyerte a 2024-es NBA bajnokságot?", a:["Denver Nuggets","Boston Celtics","Golden State Warriors","Miami Heat"], correct:0},
-{q:"Melyik sporthoz tartozik a 'birdie' kifejezés?", a:["Golf","Röplabda","Tenisz","Asztalitenisz"], correct:0},
-{q:"Melyik ország rendezte a 1956-os nyári olimpiát?", a:["Ausztrália","USA","Olaszország","Görögország"], correct:0},
-{q:"Melyik sportban van a 'service ace'?", a:["Tenisz","Kosárlabda","Röplabda","Labdarúgás"], correct:0},
-{q:"Hány játékos van egy lacrosse csapatban pályán?", a:["10","9","11","12"], correct:0},
-{q:"Melyik ország nyerte a 2013-as férfi labdarúgó Konföderációs Kupát?", a:["Brazília","Spanyolország","Olaszország","Chile"], correct:0},
-{q:"Melyik sportban van a 'line drive'?", a:["Baseball","Kricket","Labdarúgás","Röplabda"], correct:0},
-{q:"Ki nyerte a 2022-es Tour de France-t?", a:["Jonas Vingegaard","Tadej Pogačar","Primož Roglič","Richard Carapaz"], correct:0},
-{q:"Melyik sportban van a 'paddle'?", a:["Kajak-kenu","Asztalitenisz","Padel","Összes fenti"], correct:3},
-{q:"Melyik ország rendezte a 1984-es nyári olimpiát?", a:["USA","Szovjetunió","Olaszország","Kanada"], correct:0},
-{q:"Melyik sportban van a 'touchback'?", a:["Amerikai futball","Labdarúgás","Rugby","Kricket"], correct:0},
-{q:"Melyik sporthoz tartozik a 'hole-in-one'?", a:["Golf","Röplabda","Tenisz","Asztalitenisz"], correct:0},
-{q:"Ki nyerte a legtöbb Formula-1 pole pozíciót 2025-ig?", a:["Lewis Hamilton","Michael Schumacher","Ayrton Senna","Sebastian Vettel"], correct:0},
-{q:"Melyik ország nyerte a 1990-es labdarúgó világbajnokságot?", a:["Németország","Argentína","Brazília","Olaszország"], correct:0},
-{q:"Melyik sportban van a 'sand wedge'?", a:["Golf","Röplabda","Tenisz","Asztalitenisz"], correct:0},
-{q:"Hány perc egy profi kosárlabda negyed?", a:["12","10","15","8"], correct:0},
-{q:"Melyik ország rendezte a 1996-os nyári olimpiát?", a:["USA","Görögország","Ausztrália","Németország"], correct:0},
-{q:"Melyik sportban van a 'goal line'?", a:["Labdarúgás","Röplabda","Kosárlabda","Tenisz"], correct:0},
-{q:"Ki nyerte a legtöbb Grand Slam női teniszezők között 2025-ig?", a:["Serena Williams","Steffi Graf","Martina Navratilova","Chris Evert"], correct:0},
-{q:"Melyik sportban van a 'slam' kifejezés?", a:["Kosárlabda","Röplabda","Tenisz","Összes fenti"], correct:3},
-{q:"Melyik ország nyerte a 2000-es labdarúgó Európa-bajnokságot?", a:["Franciaország","Itália","Németország","Spanyolország"], correct:0},
-{q:"Melyik sportban van a 'roundhouse kick'?", a:["Kick-box","MMA","Taekwondo","Összes fenti"], correct:3},
-{q:"Melyik ország rendezte a 1976-os nyári olimpiát?", a:["Kanada","USA","Ausztrália","Németország"], correct:0},
-{q:"Melyik sportban van a 'net cord'?", a:["Tenisz","Röplabda","Kosárlabda","Labdarúgás"], correct:0},
-{q:"Hány játékos van egy férfi röplabda csapatban pályán?", a:["6","5","7","4"], correct:0},
-{q:"Melyik ország nyerte a 1982-es labdarúgó világbajnokságot?", a:["Olaszország","Németország","Franciaország","Brazília"], correct:0},
-{q:"Mikor kezdődött az I. világháború?", a:["1914","1918","1939","1905"], correct:0},
-{q:"Ki volt Magyarország első királya?", a:["Szent István","Mátyás király","IV. Béla","I. Károly"], correct:0},
-{q:"Melyik évben ért véget a II. világháború?", a:["1945","1944","1939","1950"], correct:0},
-{q:"Ki volt az amerikai függetlenségi háború fő vezére?", a:["George Washington","Abraham Lincoln","Thomas Jefferson","Benjamin Franklin"], correct:0},
-{q:"Melyik birodalom omlott össze 1917-ben?", a:["Orosz Birodalom","Oszmán Birodalom","Német Birodalom","Római Birodalom"], correct:0},
-{q:"Mikor volt a francia forradalom kezdete?", a:["1789","1776","1799","1804"], correct:0},
-{q:"Ki fedezte fel Amerikát 1492-ben?", a:["Kolumbusz Kristóf","Vasco da Gama","Marco Polo","Ferdinánd Magellán"], correct:0},
-{q:"Melyik évben esett el Konstantinápoly?", a:["1453","1492","1204","1347"], correct:0},
-{q:"Ki volt a 'Napóleon császár' valós neve?", a:["Napoléon Bonaparte","Louis XVI","Charles de Gaulle","Jean Valjean"], correct:0},
-{q:"Mikor szűnt meg az Oszmán Birodalom?", a:["1922","1918","1939","1945"], correct:0},
-{q:"Ki volt a reformáció elindítója?", a:["Márton Luther","Jean Calvin","Husz János","Ignác Loyola"], correct:0},
-{q:"Melyik évben volt az 1956-os forradalom Magyarországon?", a:["1956","1945","1968","1953"], correct:0},
-{q:"Mikor zajlott a berlini fal felépítése?", a:["1961","1945","1956","1989"], correct:0},
-{q:"Ki volt az első amerikai elnök?", a:["George Washington","Abraham Lincoln","Thomas Jefferson","John Adams"], correct:0},
-{q:"Mikor indult az ipari forradalom Angliában?", a:["XVIII. század vége","XVII. század vége","XIX. század eleje","XV. század"], correct:0},
-{q:"Melyik évben ért véget a hidegháború?", a:["1991","1989","1999","1975"], correct:0},
-{q:"Ki volt Julius Caesar gyilkosa?", a:["Marcus Junius Brutus","Cicero","Nero","Augustus"], correct:0},
-{q:"Mikor volt a nagy francia forradalom csúcspontja, a jakobinus terror?", a:["1793","1789","1799","1804"], correct:0},
-{q:"Ki volt az első női brit miniszterelnök?", a:["Margaret Thatcher","Theresa May","Elizabeth II","Angela Merkel"], correct:0},
-{q:"Melyik évben robbant ki a spanyol polgárháború?", a:["1936","1939","1945","1929"], correct:0},
-{q:"Mikor történt a mohácsi csata?", a:["1526","1514","1541","1492"], correct:0},
-{q:"Ki írta az 'Értekezés a népről' című munkát?", a:["Jean-Jacques Rousseau","Voltaire","Márton Luther","Adam Smith"], correct:0},
-{q:"Mikor zajlott a Titanic katasztrófája?", a:["1912","1905","1915","1920"], correct:0},
-{q:"Mikor vált hivatalossá az Egyesült Nemzetek Szervezete?", a:["1945","1919","1920","1939"], correct:0},
-{q:"Ki volt a Római Birodalom első császára?", a:["Augustus","Julius Caesar","Nero","Traianus"], correct:0},
-{q:"Melyik évben kezdődött a 100 éves háború?", a:["1337","1415","1299","1453"], correct:0},
-{q:"Mikor történt a csernobili atomerőmű-baleset?", a:["1986","1979","1991","1980"], correct:0},
-{q:"Ki volt a református egyház megalapítója Magyarországon?", a:["Kálvin János","Márton Luther","Huszi János","Zwingli"], correct:0},
-{q:"Mikor zajlott a Watergate-botrány?", a:["1972–1974","1968–1970","1980–1982","1962–1965"], correct:0},
-{q:"Ki volt a 'Vörös Báró' a légiháborúban?", a:["Manfred von Richthofen","Erich Hartmann","Rudolf Hess","Adolf Galland"], correct:0},
-{q:"Mikor volt az első Holdraszállás?", a:["1969","1961","1972","1959"], correct:0},
-{q:"Melyik évben alakult a NATO?", a:["1949","1919","1955","1939"], correct:0},
-{q:"Ki volt a mongol birodalom alapítója?", a:["Dzsingisz kán","Kublai kán","Attila","Timur Lenk"], correct:0},
+  // DOM elemek
+  const $table      = document.getElementById('table');
+  const $question   = document.getElementById('question');
+  const $answers    = document.getElementById('answers');
+  const $timer      = document.getElementById('timer');
+  const $stakeEl    = document.getElementById('stake');
+  const $potEl      = document.getElementById('pot');
+  const $rankEl     = document.getElementById('rank');
+  const $roundMsg   = document.getElementById('roundMsg');
+  const $potCenter  = document.getElementById('potCenter');
+  const $raiseTimerEl = document.getElementById('raise-timer');
 
-];
+  let players = [];          // { username, points, active, id }
+  let currentQuestion = null;
+  let answered = false;
+  let stake = 10;
+  let pot   = 0;
+  let tInterval = null;
 
-/* ================================
-   ÁLLAPOT
-   ================================ */
-// A bejelentkezett felhasználó nevének beolvasása
-const currentUser = localStorage.getItem("username") || "Ismeretlen";
-let players = [
-  {id:1, name:currentUser, points:100, active:true, answer:null},
-  {id:2, name:"P2", points:100, active:true, answer:null},
-  {id:3, name:"P3", points:100, active:true, answer:null},
-  {id:4, name:"P4", points:100, active:true, answer:null},
-  {id:5, name:"P5", points:100, active:true, answer:null},
-  {id:6, name:"P6", points:100, active:true, answer:null},
-  {id:7, name:"P7", points:100, active:true, answer:null},
-];
+  let raiseTimer = 600;
+  let raiseCountdownInterval = null;
+  let stakeInterval = null;
 
-let currentQ = 0;
-let stake = 10;
-let pot = 0;
-let timer = 15;          // 15 mp / kör
-let tInterval = null;
-//let stakeInterval = null;
-let answering = true;    // saját válaszgombok engedélyezése
+  function fmt(n){ return Math.round(n); }
 
-/* ================================
-   SEGÉDEK DOM-hoz
-   ================================ */
-const $table   = document.getElementById('table');
-const $answers = document.getElementById('answers');
-const $question= document.getElementById('question');
-const $timer   = document.getElementById('timer');
-const $stake   = document.getElementById('stake');
-const $pot     = document.getElementById('pot');
-const $rank    = document.getElementById('rank');
-const $roundMsg= document.getElementById('roundMsg');
-const $potCenter = document.getElementById('potCenter');
-
-function fmt(n){ return Math.round(n); }
-
-/* ================================
-   JÁTÉKOSOK ELHELYEZÉSE OVÁLISON
-   ================================ */
-function renderPlayers(){
-  // töröljük az előző player bubikat
-  [...$table.querySelectorAll('.player')].forEach(n=>n.remove());
-
-  const W = $table.clientWidth, H = $table.clientHeight;
-  const cx = W/2, cy = H/2;
-  const rx = W/2 - 70;      // ovális vízszintes sugár (padding figyelembe véve)
-  const ry = H/2 - 40;      // ovális függőleges sugár
-
-  const N = players.length;
-  for(let i=0;i<N;i++){
-    const p = players[i];
-    const angle = (2*Math.PI*i/N) - Math.PI/2; // felülről indulunk
-    const x = cx + rx*Math.cos(angle);
-    const y = cy + ry*Math.sin(angle);
-
-    const div = document.createElement('div');
-    div.className = 'player' + (p.active?'':' out') + (p.id===1?' me':'');
-    div.style.left = (x-36)+'px';
-    div.style.top  = (y-36)+'px';
-    div.dataset.pid = p.id;
-    div.innerHTML = `<div class="name">${p.name}</div><div class="pts">${fmt(p.points)}</div>`;
-    $table.appendChild(div);
-  }
-}
-
-/* ================================
-   KÉRDÉS BETÖLTÉSE
-   ================================= */
-function loadQuestion() {
-  console.log("🌀 loadQuestion() meghívva");
-
-  // ha már csak 1 aktív van, itt se húzzunk új kérdést
-  const activePlayers = players.filter(p => p.active);
-  if (activePlayers.length <= 1) {
-    console.log("🏁 Játék vége (loadQuestion elején)");
-    stopRoundTimer();
-    setTimeout(() => {
-      calculateFinalPrizes();
-    }, 300);
-    return;
-  }
-
-  // ha elfogytak a kérdések, induljon elölről
-  if (currentQ >= questions.length) currentQ = 0;
-
-  const q = questions[currentQ];
-  $question.textContent = q.q;
-
-  // válaszgombok
-  $answers.innerHTML = '';
-  q.a.forEach((label, idx) => {
-    const btn = document.createElement('button');
-    btn.className = 'answer-btn';
-    btn.textContent = label;
-    btn.onclick = () => submitAnswer(idx);
-    $answers.appendChild(btn);
-  });
-  setButtonsEnabled(true);
-  answering = true;
-
-  // reset answers
-  players.forEach(p => p.answer = null);
-
-  // 15 mp-es köridő
-  timer = 15;
-  $timer.textContent = timer;
-  stopRoundTimer();
-  tInterval = setInterval(() => {
-    timer--;
-    $timer.textContent = timer;
-    if (timer <= 0) {
-      submitAnswer(null);  // nem válaszolt
-    }
-  }, 1000);
-
-  $roundMsg.textContent = '';
-  renderPlayers();
-  updateInfo();
-}
-
-/* ================================
-   VÁLASZ BEKÜLDÉSE + KÖR LEFUT
-   ================================= */
-async function submitAnswer(myAnswerIndex) {
-  if (!answering) return;
-  answering = false;
-  setButtonsEnabled(false);
-  stopRoundTimer();
-
-  const q = questions[currentQ];
-
-  // TE
-  const me = players.find(p => p.id === 1);
-  me.answer = myAnswerIndex;
-
-  // BOTOK
-  players.forEach(p => {
-    if (p.active && p.id !== 1) {
-      const smart = Math.random() < 0.55;
-      p.answer = smart ? q.correct : Math.floor(Math.random() * q.a.length);
+  // ===== Socket inicializálás =====
+  const socket = io({
+    query: {
+      username,
+      tournamentId: tournament.id
     }
   });
 
-  // befizetés
-  const payMap = new Map();
-  players.forEach(p => {
-    if (p.active) {
-      const pay = Math.min(p.points, stake);
-      p.points -= pay;
-      if (p.points <= 0) {
-        p.points = 0;
-        p.active = false;
+  socket.on("connect", () => {
+    console.log("🔌 Socket csatlakozva:", socket.id);
+  });
+
+  // ====== Játékosok kezelése + kirajzolás ======
+  function syncPlayers(list){
+    // list: [{ username, points, active }]
+    const byName = new Map(players.map(p => [p.username, p]));
+    let nextId = 1;
+    players = list.map(p => {
+      const existing = byName.get(p.username);
+      if (existing) {
+        existing.points = p.points;
+        existing.active = p.active;
+        existing.id = nextId++;
+        return existing;
       }
-      if (pay > 0) payMap.set(p.id, pay);
-    }
+      return {
+        id: nextId++,
+        username: p.username,
+        points: p.points,
+        active: p.active
+      };
+    });
+    renderPlayers();
+    updateInfo();
+  }
+
+  function renderPlayers(){
+    [...$table.querySelectorAll('.player')].forEach(n => n.remove());
+
+    const W = $table.clientWidth;
+    const H = $table.clientHeight;
+    const cx = W / 2;
+    const cy = H / 2;
+    const rx = W / 2 - 70;
+    const ry = H / 2 - 40;
+    const N  = players.length || 1;
+
+    players.forEach((p, i) => {
+      const angle = (2 * Math.PI * i / N) - Math.PI/2;
+      const x = cx + rx * Math.cos(angle);
+      const y = cy + ry * Math.sin(angle);
+
+      const div = document.createElement('div');
+      div.className = 'player'
+        + (p.username === username ? ' me' : '')
+        + (!p.active ? ' out' : '');
+      div.style.left = (x - 36) + 'px';
+      div.style.top  = (y - 36) + 'px';
+      div.dataset.pid = p.id;
+      div.innerHTML = `
+        <div class="name">${p.username}</div>
+        <div class="pts">${fmt(p.points)}</div>
+      `;
+      $table.appendChild(div);
+    });
+  }
+
+  function getPlayerByName(name){
+    return players.find(p => p.username === name);
+  }
+
+  function getPlayerCenter(pid){
+    const el = [...$table.querySelectorAll('.player')].find(d => +d.dataset.pid === pid);
+    if (!el) return { x: $table.clientWidth/2, y:$table.clientHeight/2 };
+    const rect  = el.getBoundingClientRect();
+    const tRect = $table.getBoundingClientRect();
+    return {
+      x: rect.left - tRect.left + rect.width/2,
+      y: rect.top  - tRect.top  + rect.height/2
+    };
+  }
+
+  function getPotCenter(){
+    const rect  = $potCenter.getBoundingClientRect();
+    const tRect = $table.getBoundingClientRect();
+    return {
+      x: rect.left - tRect.left + rect.width/2,
+      y: rect.top  - tRect.top  + rect.height/2
+    };
+  }
+
+  function makeChip(x,y,label){
+    const c = document.createElement('div');
+    c.className = 'chip';
+    c.style.left = x + 'px';
+    c.style.top  = y + 'px';
+    c.textContent = label;
+    $table.appendChild(c);
+    return c;
+  }
+
+  function animateChipsToCenterFromMap(payMap){
+    return new Promise(resolve => {
+      const center = getPotCenter();
+      const chips = [];
+      payMap.forEach((amount, pid) => {
+        const from = getPlayerCenter(pid);
+        const chip = makeChip(from.x, from.y, amount);
+        requestAnimationFrame(() => {
+          chip.style.left = center.x + 'px';
+          chip.style.top  = center.y + 'px';
+        });
+        chips.push(chip);
+      });
+      setTimeout(() => {
+        chips.forEach(ch => ch.remove());
+        resolve();
+      }, 700);
+    });
+  }
+
+  function animateChipsFromCenterToWinners(winners, share){
+    return new Promise(resolve => {
+      if (!winners.length || share <= 0) return resolve();
+      const center = getPotCenter();
+      const chips = winners.map(w => {
+        const chip = makeChip(center.x, center.y, share);
+        return { chip, pid: w.id };
+      });
+      requestAnimationFrame(() => {
+        chips.forEach(({chip,pid}) => {
+          const to = getPlayerCenter(pid);
+          chip.style.left = to.x + 'px';
+          chip.style.top  = to.y + 'px';
+        });
+      });
+      setTimeout(() => {
+        chips.forEach(({chip}) => chip.remove());
+        resolve();
+      }, 750);
+    });
+  }
+
+  function flashWinners(winners){
+    winners.forEach(w => {
+      const el = [...$table.querySelectorAll('.player')]
+        .find(d => +d.dataset.pid === w.id);
+      if (el) {
+        el.classList.add('flash');
+        setTimeout(() => el.classList.remove('flash'), 1800);
+      }
+    });
+  }
+
+  function updateInfo(){
+    $stakeEl.textContent = stake;
+    $potEl.textContent   = fmt(pot);
+
+    const actives = players.filter(p => p.active)
+                           .sort((a,b) => b.points - a.points);
+    const me = players.find(p => p.username === username);
+    const meIdx = actives.findIndex(p => p.username === username);
+
+    $rankEl.textContent =
+      me && meIdx >= 0
+        ? `${meIdx+1} / ${actives.length}`
+        : `- / ${actives.length || 0}`;
+
+    $table.querySelectorAll('.player').forEach(div => {
+      const pid = +div.dataset.pid;
+      const p = players.find(x => x.id === pid);
+      if (!p) return;
+      div.classList.toggle('out', !p.active);
+      const pts = div.querySelector('.pts');
+      if (pts) pts.textContent = fmt(p.points);
+    });
+  }
+
+  function setButtonsEnabled(on){
+    [...$answers.querySelectorAll('button')].forEach(b => b.disabled = !on);
+  }
+
+  function startQuestionTimer(){
+    if (tInterval) clearInterval(tInterval);
+    let t = 15;
+    $timer.textContent = t;
+    tInterval = setInterval(() => {
+      if (t > 0) {
+        t--;
+        $timer.textContent = t;
+      } else {
+        clearInterval(tInterval);
+        if (!answered && currentQuestion) {
+          console.log("⏰ Idő lejárt, automatikus passz");
+          sendAnswer(null);
+        }
+      }
+    }, 1000);
+  }
+
+  // ====== Tét duplázó (csak vizuál, mint eddig) ======
+  function updateRaiseTimer(){
+    const m = Math.floor(raiseTimer / 60);
+    const s = (raiseTimer % 60).toString().padStart(2,'0');
+    if ($raiseTimerEl)
+      $raiseTimerEl.textContent = `Következő tét emelés: ${m}:${s}`;
+  }
+
+  function startStakeDoubler(){
+    if (stakeInterval) clearInterval(stakeInterval);
+    if (raiseCountdownInterval) clearInterval(raiseCountdownInterval);
+    raiseTimer = 600;
+    updateRaiseTimer();
+
+    stakeInterval = setInterval(() => {
+      stake *= 2;
+      updateInfo();
+      raiseTimer = 600;
+      if ($raiseTimerEl){
+        $raiseTimerEl.style.color = '#ff4040';
+        setTimeout(() => $raiseTimerEl.style.color = '#ffd700', 800);
+      }
+    }, 10 * 60 * 1000);
+
+    raiseCountdownInterval = setInterval(() => {
+      if (raiseTimer > 0){
+        raiseTimer--;
+        updateRaiseTimer();
+      }
+    }, 1000);
+  }
+
+  // ===== SOCKET események =====
+
+  socket.on("currentPlayers", (list) => {
+    console.log("👥 currentPlayers:", list);
+    syncPlayers(list);
   });
 
-  // animáció befelé
-  await animateChipsToCenter(payMap);
+  socket.on("newQuestion", (q) => {
+    console.log("📩 Új kérdés:", q);
+    currentQuestion = q;
+    answered = false;
 
-  // pot növelés
-  let added = 0;
-  payMap.forEach(v => added += v);
-  pot += added;
-  updateInfo();
+    $question.textContent = q.q;
+    $roundMsg.textContent = "";
+    $answers.innerHTML = "";
 
-  // helyesek
-  const roundWinners = players.filter(p => p.active && p.answer === q.correct);
-  const hadWinners = roundWinners.length > 0;
+    (q.a || []).forEach((ans, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'answer-btn';
+      btn.textContent = ans;
+      btn.onclick = () => sendAnswer(idx);
+      $answers.appendChild(btn);
+    });
 
-  let share = 0;
-  if (hadWinners) {
-    share = Math.floor(pot / roundWinners.length);
-  }
+    setButtonsEnabled(true);
+    startQuestionTimer();
+  });
 
-  // nyertesekhez anim
-  if (hadWinners) {
-    await animateChipsFromCenterToWinners(roundWinners, share);
-    roundWinners.forEach(p => p.points += share);
-    pot = pot - share * roundWinners.length;
-    updateInfo();
-    flashWinners(roundWinners);
-    $roundMsg.textContent = "Helyes válasz! Nyeremény kiosztva.";
-  } else {
-    $roundMsg.textContent = "Senki sem találta el, a pot bent marad.";
-  }
+  socket.on("playerResult", async (data) => {
+    console.log("🏆 playerResult:", data);
+    if (!currentQuestion) return;
 
-  // helyes gomb megjelölése
-  const correctIndex = q.correct;
-  const correctBtn = $answers.querySelectorAll('button')[correctIndex];
-  if (correctBtn) {
-    correctBtn.style.background = '#27ae60';
-    correctBtn.style.color = '#fff';
-    correctBtn.classList.add('flash-correct');
-  }
+    // Szerver már levonta a tétet és frissítette a pontokat -> sync
+    stake = data.stake;
+    pot   = data.pot;
+    syncPlayers(data.players);
 
-  // ha TE kifogytál a pontból, ess ki
-  if (me.points <= 0) {
-    me.active = false;
-    console.log(`💀 ${me.name} kiesett a játékból`);
+    // Befizetés vizuális animáció – feltételezzük, hogy minden aktív befizetett
+    const payMap = new Map();
+    players.forEach(p => {
+      if (!p.active) return;
+      const pid = p.id;
+      // csak vizuális: tét összege
+      payMap.set(pid, stake);
+    });
 
-    // kieső képernyő
-    const overlay = document.createElement('div');
-    overlay.style.position = 'fixed';
-    overlay.style.inset = '0';
-    overlay.style.background = 'rgba(0,0,0,0.95)';
-    overlay.style.display = 'flex';
-    overlay.style.flexDirection = 'column';
-    overlay.style.alignItems = 'center';
-    overlay.style.justifyContent = 'center';
-    overlay.style.color = '#fff';
-    overlay.style.fontSize = '1.5rem';
-    overlay.style.zIndex = '999';
+    await animateChipsToCenterFromMap(payMap);
 
-    const actives = players.filter(p => p.active).sort((a, b) => b.points - a.points);
-    const meRank = actives.length + 1;
-    const p = document.createElement('p');
-    p.textContent = `💀 Ki estél! Helyezésed: ${meRank}/${players.length}`;
-    overlay.appendChild(p);
+    // Nyertesek
+    const winners = (data.results || [])
+      .filter(r => r.correct)
+      .map(r => getPlayerByName(r.username))
+      .filter(Boolean);
 
-    const backBtn = document.createElement('button');
-    backBtn.textContent = '🏠 Vissza a főoldalra';
-    backBtn.style.marginTop = '25px';
-    backBtn.style.padding = '10px 25px';
-    backBtn.style.border = 'none';
-    backBtn.style.borderRadius = '8px';
-    backBtn.style.background = '#c0392b';
-    backBtn.style.color = '#fff';
-    backBtn.onclick = () => window.location.href = '/tournaments';
+    if (winners.length){
+      await animateChipsFromCenterToWinners(winners, data.share || 0);
+      flashWinners(winners);
+      $roundMsg.textContent = "Helyes válasz! Nyeremény kiosztva.";
+    } else {
+      $roundMsg.textContent = "Senki sem találta el, a pot bent marad.";
+    }
+
+    // Helyes válasz kiírása
+    if (typeof data.correctIndex === "number" && currentQuestion.a) {
+      const correctText = currentQuestion.a[data.correctIndex];
+      $question.textContent = `${currentQuestion.q}  ✅ Helyes válasz: ${correctText}`;
+    }
+
+    setButtonsEnabled(false);
+  });
+
+ socket.on("gameOver", (data) => {
+    console.log("🏁 Végeredmény:", data);
+
+    const overlay = document.createElement("div");
+    overlay.style.position = "fixed";
+    overlay.style.inset = "0";
+    overlay.style.background = "rgba(0,0,0,0.9)";
+    overlay.style.color = "#fff";
+    overlay.style.display = "flex";
+    overlay.style.flexDirection = "column";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.fontSize = "1.3rem";
+    overlay.style.zIndex = "9999";
+
+    overlay.innerHTML = `<h2>🏆 Végeredmény</h2>`;
+
+    // ---- ADATOK NORMALIZÁLÁSA ----
+    const ranked  = data.ranked || [];         // [{ username, points }]
+    let prizes    = data.prizes || {};         // { username: amount } – ha a szerver így küldi
+    const winners = data.winners || [];        // [ "név", ... ] – ha így küldi
+    const rewardEach = data.rewardEach || 0;   // ha minden nyertes ugyanannyit kap
+    const singleWinner = data.winner;          // ha csak 1 győztes van
+    const singleReward = data.reward || 0;     // annak az összege
+
+    // Ha a prizes üres VAGY csak 0-k vannak benne, próbáljuk meg a többiből felépíteni
+    const prizeValues   = Object.values(prizes);
+    const prizesMissing = prizeValues.length === 0 || prizeValues.every(v => !v);
+
+    if (prizesMissing) {
+      prizes = {};
+
+      // Több nyertes: winners + rewardEach
+      if (Array.isArray(winners) && winners.length && rewardEach > 0) {
+        winners.forEach(name => prizes[name] = rewardEach);
+      }
+      // Egy nyertes: winner + reward
+      else if (singleWinner && singleReward > 0) {
+        prizes[singleWinner] = singleReward;
+      }
+    }
+
+    // ---- Ranglista kiírása ----
+    ranked.forEach((p, i) => {
+      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "🏅";
+      const div = document.createElement("div");
+      const prize = prizes[p.username] || 0;
+      div.textContent = `${medal} ${i + 1}. hely: ${p.username} (${p.points} pont) – +${prize} zseton`;
+      overlay.appendChild(div);
+    });
+
+    // ---- Saját nyeremény ----
+    const myPrize = prizes[username] || 0;
+    const myRankIndex = ranked.findIndex(p => p.username === username);
+    const myRankText = myRankIndex >= 0 ? (myRankIndex + 1) : "-";
+
+    const prizeText = document.createElement("div");
+    prizeText.style.marginTop = "20px";
+    prizeText.style.fontSize = "1.4rem";
+    prizeText.style.fontWeight = "bold";
+    prizeText.style.color = myPrize > 0 ? "#FFD700" : "#ccc";
+    prizeText.textContent =
+      myPrize > 0
+        ? `💰 Nyereményed: ${myPrize.toLocaleString()} zseton (🏅 ${myRankText}. hely)`
+        : "😔 Sajnos most nem nyertél.";
+    overlay.appendChild(prizeText);
+
+    const backBtn = document.createElement("button");
+    backBtn.textContent = "🏠 Vissza a főoldalra";
+    backBtn.style.marginTop = "25px";
+    backBtn.style.padding = "10px 20px";
+    backBtn.style.background = "#e67e22";
+    backBtn.style.border = "none";
+    backBtn.style.borderRadius = "8px";
+    backBtn.style.cursor = "pointer";
+    backBtn.onclick = () => window.location.href = "/tournaments";
     overlay.appendChild(backBtn);
 
     document.body.appendChild(overlay);
+
+    // ⚠ FIGYELEM: ha a szerver MÁR jóváírja a nyereményt az adatbázisban,
+    // akkor ezt NYUGODTAN KIKOMMENTELHETED, hogy ne duplán írja jóvá.
+    /*
+    if (myPrize > 0) {
+      fetch("/api/addwinnings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: username, amount: myPrize })
+      })
+        .then(res => res.json())
+        .then(data => console.log("💾 Nyeremény elmentve:", data))
+        .catch(err => console.error("❌ Hiba a nyeremény mentésénél:", err));
+    }
+    */
+  });
+
+  function sendAnswer(answerIndex){
+    if (answered || !currentQuestion) return;
+    answered = true;
+    setButtonsEnabled(false);
+
+    console.log("📤 Válasz küldése:", answerIndex);
+    socket.emit("playerAnswer", { answerIndex });
   }
 
-  // pont alapján deaktiváljuk azokat, akik elfogytak
-  players.forEach(p => {
-    if (p.points <= 0) p.active = false;
+  document.addEventListener("DOMContentLoaded", () => {
+    startStakeDoubler();
   });
+socket.on("youAreOut", (data) => {
+    if (data.username !== username) return; // másnak szólt
 
-  console.log("🔁 Frissített játékos állapotok (kör vége):", players);
+    // Megállítjuk a socketet
+    socket.disconnect();
 
-  // VAN-E MÉG TÖBB JÁTÉKOS?
-  const activePlayers = players.filter(p => p.active);
-  if (activePlayers.length <= 1) {
-    console.log("🏁 Játék vége – submitAnswer végén");
-    // kis késés, hogy a DOM is frissüljön
-    setTimeout(() => {
-      calculateFinalPrizes();
-    }, 400);
-    return;
+    // Kiestél overlay
+    const overlay = document.createElement("div");
+    overlay.style.position = "fixed";
+    overlay.style.inset = "0";
+    overlay.style.background = "rgba(0,0,0,0.9)";
+    overlay.style.color = "#fff";
+    overlay.style.display = "flex";
+    overlay.style.flexDirection = "column";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.fontSize = "1.3rem";
+    overlay.style.zIndex = "9999";
+
+    overlay.innerHTML = `
+        <h2>❌ Kiestél a játékból!</h2>
+        <p>📊 Helyezésed: <b>${data.rank} / ${data.total}</b></p>
+        <p>💰 Nyereményed: <b>${data.prize}</b> zseton</p>
+    `;
+
+    const backBtn = document.createElement("button");
+    backBtn.textContent = "🏠 Vissza a főoldalra";
+    backBtn.style.marginTop = "25px";
+    backBtn.style.padding = "10px 20px";
+    backBtn.style.background = "#e67e22";
+    backBtn.style.border = "none";
+    backBtn.style.borderRadius = "8px";
+    backBtn.style.cursor = "pointer";
+    backBtn.onclick = () => window.location.href = "/tournaments";
+
+    overlay.appendChild(backBtn);
+
+    document.body.appendChild(overlay);
+});
+let breakOverlay = null;
+let breakTimerInterval = null;
+
+socket.on("breakStart", ({ secondsLeft }) => {
+  console.log("⏸ Szünet indul, másodpercek:", secondsLeft);
+
+  if (!breakOverlay) {
+    breakOverlay = document.createElement("div");
+    breakOverlay.id = "breakOverlay";
+    Object.assign(breakOverlay.style, {
+      position: "fixed",
+      inset: "0",
+      background: "rgba(0,0,0,0.9)",
+      color: "#fff",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: "1.6rem",
+      zIndex: "9999",
+    });
+
+    breakOverlay.innerHTML = `
+      <div style="font-size:2rem; margin-bottom:10px;">⏸ Szünet van!</div>
+      <div style="margin-bottom:10px;">A játék a SZÜNET után folytatódik.</div>
+      <div id="breakTimer" style="font-size:1.4rem; font-weight:bold;"></div>
+    `;
+
+    document.body.appendChild(breakOverlay);
+  } else {
+    breakOverlay.style.display = "flex";
   }
 
-  // következő kérdés
-  currentQ++;
-  setTimeout(loadQuestion, 1400);
-}
+  // válaszgombok tiltása
+  setButtonsEnabled(false);
 
-/* ================================
-   GOMBOK ENGEDÉLYEZÉSE
-   ================================= */
-function setButtonsEnabled(on){
-  [...$answers.querySelectorAll('button')].forEach(b => b.disabled = !on);
-}
+  let t = secondsLeft;
+  const timerLabel = breakOverlay.querySelector("#breakTimer");
 
-/* ================================
-   TIMER SEGÉD
-   ================================= */
-function stopRoundTimer(){
-  if (tInterval) {
-    clearInterval(tInterval);
-    tInterval = null;
+  if (breakTimerInterval) clearInterval(breakTimerInterval);
+
+  function updateTimer() {
+    const m = Math.floor(t / 60);
+    const s = (t % 60).toString().padStart(2, "0");
+    timerLabel.textContent = `Hátralévő szünet: ${m}:${s}`;
   }
-}
 
-/* ================================
-   UI FRISSÍTÉS
-   ================================= */
-function updateInfo(){
-  $stake.textContent = stake;
-  $pot.textContent = fmt(pot);
+  updateTimer();
 
-  const actives = players.filter(p=>p.active).sort((a,b)=>b.points-a.points);
-  const meIdx = actives.findIndex(p=>p.id===1);
-  $rank.textContent = (meIdx>=0 ? (meIdx+1) : "-") + " / " + actives.length;
-
-  $table.querySelectorAll('.player').forEach(div=>{
-    const pid = +div.dataset.pid;
-    const p = players.find(x=>x.id===pid);
-    div.classList.toggle('out', !p.active);
-    div.querySelector('.pts').textContent = fmt(p.points);
-  });
-}
-/* ================================
-   ZSETON ANIMÁCIÓK
-   ================================= */
-function getPlayerCenter(pid){
-  const el = [...$table.querySelectorAll('.player')].find(d=>+d.dataset.pid===pid);
-  const rect = el.getBoundingClientRect();
-  const tRect = $table.getBoundingClientRect();
-  return { x: rect.left - tRect.left + rect.width/2, y: rect.top - tRect.top + rect.height/2 };
-}
-
-function getPotCenter(){
-  const rect = $potCenter.getBoundingClientRect();
-  const tRect = $table.getBoundingClientRect();
-  return { x: rect.left - tRect.left + rect.width/2, y: rect.top - tRect.top + rect.height/2 };
-}
-
-function makeChip(x,y,label){
-  const c = document.createElement('div');
-  c.className='chip';
-  c.style.left = x+'px';
-  c.style.top  = y+'px';
-  c.textContent = label;
-  $table.appendChild(c);
-  return c;
-}
-
-// Minden befizető játékostól 1 zseton (a tét összegével) bemegy középre
-function animateChipsToCenter(payMap){
-  return new Promise(resolve=>{
-    const center = getPotCenter();
-    const chips = [];
-    payMap.forEach((amount, pid)=>{
-      const from = getPlayerCenter(pid);
-      const chip = makeChip(from.x, from.y, amount);
-      requestAnimationFrame(()=>{
-        chip.style.left = center.x+'px';
-        chip.style.top  = center.y+'px';
-      });
-      chips.push(chip);
-    });
-    setTimeout(()=>{ chips.forEach(ch=>ch.remove()); resolve(); }, 700);
-  });
-}
-
-// Középről szétosztjuk a nyertesekhez
-function animateChipsFromCenterToWinners(winners, share){
-  return new Promise(resolve=>{
-    if(share<=0 || winners.length===0){ resolve(); return; }
-    const center = getPotCenter();
-    const chips = winners.map(w=>{
-      const chip = makeChip(center.x, center.y, share);
-      return {chip, pid:w.id};
-    });
-    requestAnimationFrame(()=>{
-      chips.forEach(({chip,pid})=>{
-        const to = getPlayerCenter(pid);
-        chip.style.left = to.x+'px';
-        chip.style.top  = to.y+'px';
-      });
-    });
-    setTimeout(()=>{ chips.forEach(({chip})=>chip.remove()); resolve(); }, 750);
-  });
-}
-
-/* ================================
-   VILLOGTATÁS GYŐZTESEKEN
-   ================================= */
-function flashWinners(winners){
-  winners.forEach(w=>{
-    const el = [...$table.querySelectorAll('.player')].find(d=>+d.dataset.pid===w.id);
-    if(el){
-      el.classList.add('flash');
-      setTimeout(()=>el.classList.remove('flash'), 1800);
+  breakTimerInterval = setInterval(() => {
+    t--;
+    if (t < 0) {
+      clearInterval(breakTimerInterval);
+      return;
     }
-  });
-}
-// ======== TÉT DUPLÁZÓDÁS + VISSZASZÁMLÁLÓ ========
-let stakeInterval;
-let raiseTimer = 180; // 3 perc másodpercben
-const raiseTimerEl = document.getElementById('raise-timer');
-
-function updateRaiseTimer() {
-  const minutes = Math.floor(raiseTimer / 60);
-  const seconds = (raiseTimer % 60).toString().padStart(2, '0');
-  if (raiseTimerEl)
-    raiseTimerEl.textContent = `Következő tét emelés: ${minutes}:${seconds}`;
-}
-
-function startStakeDoubler() {
-  if (stakeInterval) clearInterval(stakeInterval);
-  if (gamePaused) return;
-  raiseTimer = 180;
-  updateRaiseTimer();
-
-  stakeInterval = setInterval(() => {
-    // 💰 Tét duplázás
-    stake *= 2;
-    updateInfo();
-
-    // 🔁 Új ciklus visszaszámlálóhoz
-    raiseTimer = 180;
-
-    // Villanás vizuálisan
-    if (raiseTimerEl) {
-      raiseTimerEl.style.color = '#ff4040';
-      setTimeout(() => (raiseTimerEl.style.color = '#ffd700'), 1000);
-    }
-  }, 3 * 60 * 1000); // 3 percenként dupláz
-
-  // Másodpercenként csökkentjük a számlálót
-  raiseCountdownInterval = setInterval(() => {
-    if (raiseTimer > 0) {
-      raiseTimer--;
-      updateRaiseTimer();
-    }
-  }, 1000);
-}
-
-/* ================================
-   NYEREMÉNYEK KIOSZTÁSA – 10%
-   ================================= */
-function calculateFinalPrizes() {
-  console.log("💰 Nyeremények kiszámítása...");
-
-  // 🧮 Pont szerint sorba rendezzük a játékosokat
-  const ranked = players.sort((a, b) => b.points - a.points);
-  const totalPlayers = ranked.length;
-
-  // 💵 Valódi nevezési díj (nem a stake!)
-  // Valódi nevezési díj a tournament objektumból (ha van)
-const entryFee = tournament?.entry_fee || 10; // ha nincs megadva, marad a 10-es biztonsági érték
-const totalPrize = entryFee * totalPlayers;
-  console.log(`💵 Teljes pot: ${totalPrize} zseton (${totalPlayers} játékos × ${entryFee} nevezési díj)`);
-
-  // 🏅 Hány játékos kapjon nyereményt (felső 10%, de legalább 1)
-  const prizeCount = Math.max(1, Math.ceil(totalPlayers * 0.1));
-
-  // 📊 Nyereményelosztás arányosan (1. hely kap legtöbbet)
-  const sumWeights = (prizeCount * (prizeCount + 1)) / 2;
-  const prizeMap = new Map();
-
-  ranked.slice(0, prizeCount).forEach((p, i) => {
-    const prize = Math.floor(((prizeCount - i) / sumWeights) * totalPrize);
-    prizeMap.set(p.id, prize);
-    console.log(`🥇 ${p.name} nyereménye: ${prize} zseton`);
-  });
-
-  // 👤 Saját játékos és nyeremény
-  const me = players.find(p => p.name === username);
-  const myPrize = prizeMap.get(me.id) || 0;
-  const myRank = ranked.findIndex(p => p.id === me.id) + 1;
-
-  // ✅ API mentés (ha van backend)
-  fetch("/api/addwinnings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: me.name, amount: myPrize })
-  })
-  .then(res => res.json())
-  .then(data => console.log("💾 Nyeremény elmentve:", data))
-  .catch(err => console.error("❌ Hiba a nyeremény mentésénél:", err));
-
-  // 🖥️ Végeredmény megjelenítése overlay-ben
-  const overlay = document.createElement("div");
-  overlay.style.position = "fixed";
-  overlay.style.inset = "0";
-  overlay.style.background = "rgba(0,0,0,0.9)";
-  overlay.style.color = "#fff";
-  overlay.style.display = "flex";
-  overlay.style.flexDirection = "column";
-  overlay.style.alignItems = "center";
-  overlay.style.justifyContent = "center";
-  overlay.style.fontSize = "1.3rem";
-  overlay.style.zIndex = "9999";
-
-  overlay.innerHTML = `<h2>🏆 Végeredmény</h2>`;
-
-  ranked.slice(0, prizeCount).forEach((p, i) => {
-    const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "🏅";
-    const div = document.createElement("div");
-    div.textContent = `${medal} ${i + 1}. hely: ${p.name} (${p.points} pont) – +${prizeMap.get(p.id) || 0} zseton`;
-    overlay.appendChild(div);
-  });
-
-  const prizeText = document.createElement("div");
-  prizeText.style.marginTop = "20px";
-  prizeText.style.fontSize = "1.4rem";
-  prizeText.style.fontWeight = "bold";
-  prizeText.style.color = myPrize > 0 ? "#FFD700" : "#ccc";
-  prizeText.textContent =
-    myPrize > 0
-      ? `💰 Nyereményed: ${myPrize.toLocaleString()} zseton (🏅 ${myRank}. hely)`
-      : "😔 Sajnos most nem nyertél.";
-  overlay.appendChild(prizeText);
-
-  const backBtn = document.createElement("button");
-  backBtn.textContent = "🏠 Vissza a főoldalra";
-  backBtn.style.marginTop = "25px";
-  backBtn.style.padding = "10px 20px";
-  backBtn.style.background = "#e67e22";
-  backBtn.style.border = "none";
-  backBtn.style.borderRadius = "8px";
-  backBtn.style.cursor = "pointer";
-  backBtn.onclick = () => window.location.href = "/";
-  overlay.appendChild(backBtn);
-
-  document.body.appendChild(overlay);
-
-  console.log(`✅ Végeredmény: ${myRank}. hely, nyeremény: ${myPrize} zseton`);
-}
-
-/* ================================
-   INDÍTÁS
-   ================================= */
-function start(){
-  console.log("🚀 start() elindult");
-  renderPlayers();
-  startStakeDoubler();
-  loadQuestion();
-}
-/* ================================
-   SZÜNET FUNKCIÓ – 10 perc / óra 50-kor
-================================ */
-let gamePaused = false;           // 🔹 EZ HIÁNYZOTT
-let breakCountdown = null;        // 🔹 EZ HIÁNYZOTT
-let raiseCountdownInterval = null; // 🔹 EZ HIÁNYZOTT (ha tét duplázás visszaszámláló van)
-let raiseTimerInterval = null;
-
-function pauseGameForBreak(){
-  if (gamePaused) return;
-  gamePaused = true;
-  answering = false;
-
-  // időzítők leállítása
-  stopRoundTimer();
-  if(stakeInterval) clearInterval(stakeInterval);
-  if(raiseCountdownInterval) clearInterval(raiseCountdownInterval);
-  if (raiseTimerInterval) clearInterval(raiseTimerInterval);
-
-  // gombok tiltása
-  document.querySelectorAll("#answers button").forEach(btn => (btn.disabled = true));
-
-  // overlay
-  const overlay = document.createElement("div");
-  overlay.id = "breakOverlay";
-  Object.assign(overlay.style, {
-    position: "fixed",
-    top: "0",
-    left: "0",
-    width: "100%",
-    height: "100%",
-    background: "rgba(0,0,0,0.85)",
-    color: "white",
-    fontSize: "2rem",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: "9999"
-  });
-
-  const resumeText = document.createElement("div");
-  const nextHour = (new Date().getHours() + 1) % 24;
-  resumeText.textContent = `A játék ${String(nextHour).padStart(2,"0")}:00-kor folytatódik.`;
-  resumeText.style.marginTop = "10px";
-  resumeText.style.fontSize = "1.5rem";
-
-  const timerDisplay = document.createElement("div");
-  timerDisplay.id = "breakTimer";
-  timerDisplay.style.marginTop = "20px";
-  timerDisplay.style.fontSize = "1.3rem";
-
-  overlay.innerHTML = `<div>⏸ Szünet van!</div>`;
-  overlay.appendChild(resumeText);
-  overlay.appendChild(timerDisplay);
-  document.body.appendChild(overlay);
-
-  let remaining = 10 * 60; // 10 perc
-  breakCountdown = setInterval(() => {
-    remaining--;
-    const m = Math.floor(remaining / 60);
-    const s = (remaining % 60).toString().padStart(2, "0");
-    timerDisplay.textContent = `Hátralévő idő: ${m}:${s}`;
-    if (remaining <= 0) {
-      clearInterval(breakCountdown);
-      resumeGameAfterBreak();
-    }
-  }, 1000);
-}
-
-function resumeGameAfterBreak(){
-  document.getElementById("breakOverlay")?.remove();
-  gamePaused = false;
-  answering = true;
-
-  // gombok engedélyezése
-  document.querySelectorAll("#answers button").forEach(btn => (btn.disabled = false));
-
-  // időzítők újraindítása
-  startStakeDoubler();
-  loadQuestion();
-}
-
-// óránként figyeljük a szünetet (50:00-kor)
-document.addEventListener("DOMContentLoaded", () => {
-  setInterval(() => {
-    const now = new Date();
-    if (now.getMinutes() === 7 && now.getSeconds() === 0 && !gamePaused) {
-      pauseGameForBreak();
-    }
+    updateTimer();
   }, 1000);
 });
-start();
+
+socket.on("breakEnd", () => {
+  console.log("▶️ Szünet vége");
+  if (breakOverlay) breakOverlay.style.display = "none";
+  setButtonsEnabled(true);
+});
 </script>
 </body>
 </html>
